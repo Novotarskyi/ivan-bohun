@@ -1,0 +1,14 @@
+CONFIG_IDF_TARGET="esp32s3"
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+# radio-only in steady state; WiFi exists ONLY inside a touch-opened OTA window (doc 38)
+CONFIG_LWIP_IPV6=n
+# LVGL: monospace fonts - unscii_16 (16px) for the banner, unscii_8 (8px) for the dense table
+CONFIG_LV_FONT_UNSCII_16=y
+CONFIG_LV_FONT_UNSCII_8=y
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+# OTA window (doc 38): dual slots + trial-or-rollback, HTTPS door on demand
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
+CONFIG_ESP_HTTPS_SERVER_ENABLE=y

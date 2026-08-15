@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="250.0mm" height="88.0mm" viewBox="0 0 250.0 88.0">
+<!-- THE FACE - IVAN BOHUN rack front panel. 1 unit = 1 mm.
+     3 mm smoked grey acrylic. Cut everything stroked below.
+     outline, 4 ear slots, 2 apertures. NO drill holes - both
+     screens and the LED bar mount by VHB from behind. -->
+<g fill="none" stroke="#000" stroke-width="0.1">
+<rect x="0" y="0" width="250.0" height="88.0" rx="3.0"/>
+<rect x="2.000" y="3.500" width="13.000" height="7.000" rx="3.500"/>
+<rect x="2.000" y="77.500" width="13.000" height="7.000" rx="3.500"/>
+<rect x="235.000" y="3.500" width="13.000" height="7.000" rx="3.500"/>
+<rect x="235.000" y="77.500" width="13.000" height="7.000" rx="3.500"/>
+<rect x="29.000" y="22.500" width="97.0" height="56.0" rx="2.0"/>
+<rect x="167.000" y="20.500" width="46.0" height="60.0" rx="2.0"/>
+</g>
+</svg>

@@ -1,0 +1,129 @@
+#!/usr/bin/env python3
+"""render_page_asset.py - bake "what the world sees" for the kobzar's second tile.
+
+Renders assets/personal.html FULL-PAGE with headless Chrome at a 1000-px desktop
+viewport scaled by 0.8 (so the output is still exactly 800 wide - the desktop
+reflow keeps the strip short enough for the 12.5 MB page partition), decodes
+the PNG in pure python (no PIL on this bench), trims the empty tail, and emits:
+  main/page_strip.bin - little-endian RGB565 pixels, 800 x PAGE_STRIP_H
+  main/page_strip.h   - generated height constant for ui.c
+The tile scrolls vertically through the whole page.
+
+Re-run after any assets/personal.html change, then rebuild the mission firmware.
+"""
+import struct
+import subprocess
+import zlib
+from pathlib import Path
+
+HERE = Path(__file__).parent
+PAGE = (HERE / "../../assets/personal.html").resolve()
+PNG = HERE / "build_page_shot.png"
+OUT = HERE / "main" / "page_strip.bin"
+HDR = HERE / "main" / "page_strip.h"
+W = 800                  # output strip width (CSSW * SCALE)
+CSSW = 1280              # CSS viewport width - desktop layout, not the tall mobile reflow
+SCALE = 0.625            # device scale factor: 1280 CSS px -> 800 output px. Was
+                         # 1000 x 0.8 until the balancer-era page outgrew the
+                         # partition at that scale; the wider viewport keeps every
+                         # section on the strip at a slightly smaller type size.
+RENDER_H = 12600         # CSS px, tall enough for the whole page; excess is trimmed
+MAX_H = 7600             # 800*7600*2 = 12.16 MB - the page partition is 0xBA0000
+                         # (12.19 MB) since 2026-08-02, so 7800 would overflow it
+
+CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+
+# ---- 1. render the whole page in one tall viewport ------------------------
+subprocess.run([
+    CHROME, "--headless=new", f"--screenshot={PNG}",
+    f"--window-size={CSSW},{RENDER_H}", f"--force-device-scale-factor={SCALE}",
+    "--hide-scrollbars", "--virtual-time-budget=6000",
+    "--disable-gpu", f"file://{PAGE}?bake=1",
+], check=True, capture_output=True)
+
+# ---- 2. decode PNG (8-bit RGB/RGBA, non-interlaced) -----------------------
+raw = PNG.read_bytes()
+assert raw[:8] == b"\x89PNG\r\n\x1a\n", "not a PNG"
+pos, idat, ihdr = 8, [], None
+while pos < len(raw):
+    (length,) = struct.unpack(">I", raw[pos:pos+4])
+    ctype = raw[pos+4:pos+8]
+    if ctype == b"IHDR":
+        ihdr = struct.unpack(">IIBBBBB", raw[pos+8:pos+8+length])
+    elif ctype == b"IDAT":
+        idat.append(raw[pos+8:pos+8+length])
+    pos += 12 + length
+
+w, h, depth, ctype_, comp, filt, interlace = ihdr
+assert w == W, f"screenshot is {w}x{h}, want width {W}"  # noqa
+assert h >= 6000, f"suspiciously short render: {w}x{h}"
+assert depth == 8 and ctype_ in (2, 6) and interlace == 0, f"unsupported PNG shape {ihdr}"
+bpp = 3 if ctype_ == 2 else 4
+stride = w * bpp
+plain = zlib.decompress(b"".join(idat))
+
+def paeth(a, b, c):
+    p = a + b - c
+    pa, pb, pc = abs(p - a), abs(p - b), abs(p - c)
+    return a if (pa <= pb and pa <= pc) else (b if pb <= pc else c)
+
+rows = []
+prev = bytearray(stride)
+for y in range(h):
+    f = plain[y * (stride + 1)]
+    line = bytearray(plain[y * (stride + 1) + 1: (y + 1) * (stride + 1)])
+    if f == 1:
+        for i in range(bpp, stride):
+            line[i] = (line[i] + line[i - bpp]) & 0xff
+    elif f == 2:
+        for i in range(stride):
+            line[i] = (line[i] + prev[i]) & 0xff
+    elif f == 3:
+        for i in range(stride):
+            left = line[i - bpp] if i >= bpp else 0
+            line[i] = (line[i] + ((left + prev[i]) >> 1)) & 0xff
+    elif f == 4:
+        for i in range(stride):
+            left = line[i - bpp] if i >= bpp else 0
+            ul = prev[i - bpp] if i >= bpp else 0
+            line[i] = (line[i] + paeth(left, prev[i], ul)) & 0xff
+    prev = line
+    rows.append(line)
+
+# ---- 3. trim the empty tail (rows that are ~uniform background) -----------
+def row_busy(line):
+    r0, g0, b0 = line[0], line[1], line[2]
+    hits = 0
+    for x in range(0, W, 8):        # sample every 8th px
+        if abs(line[x*bpp] - r0) + abs(line[x*bpp+1] - g0) + abs(line[x*bpp+2] - b0) > 24:
+            hits += 1
+            if hits > 3:
+                return True
+    return False
+
+bottom = h
+while bottom > 480 and not row_busy(rows[bottom - 1]):
+    bottom -= 1
+bottom = min(bottom + 24, h, MAX_H)
+if bottom % 2:
+    bottom += 1
+
+# ---- 4. RGB888 -> RGB565 little-endian ------------------------------------
+out = bytearray(W * bottom * 2)
+oi = 0
+for y in range(bottom):
+    line = rows[y]
+    for x in range(W):
+        r, g, b = line[x*bpp], line[x*bpp+1], line[x*bpp+2]
+        v = ((r & 0xf8) << 8) | ((g & 0xfc) << 3) | (b >> 3)
+        out[oi] = v & 0xff
+        out[oi+1] = v >> 8
+        oi += 2
+
+OUT.write_bytes(out)
+HDR.write_text("/* generated by render_page_asset.py - do not edit */\n"
+               "#pragma once\n"
+               f"#define PAGE_STRIP_W {W}\n"
+               f"#define PAGE_STRIP_H {bottom}\n")
+PNG.unlink()
+print(f"page_strip.bin: {len(out)} bytes ({W}x{bottom} RGB565 LE, trimmed from {h})")

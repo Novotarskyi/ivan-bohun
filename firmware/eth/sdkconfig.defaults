@@ -1,0 +1,112 @@
+CONFIG_IDF_TARGET="esp32s3"
+# bohun node firmware - COMMON defaults; pair with exactly one boards/<board>.defaults
+CONFIG_ETHERNET_INTERNAL_SUPPORT=n
+CONFIG_ETHERNET_SPI_SUPPORT=y
+CONFIG_ETHERNET_SPI_DEV0_W5500=y
+CONFIG_ETHERNET_SPI_DEV1_NONE=y
+CONFIG_ETHERNET_SPI_HOST=1
+# W5500 pins live in boards/<board>.defaults - same GPIO set {9-14}, PERMUTED per vendor
+CONFIG_ETHERNET_SPI_CLOCK_MHZ=20
+# the chip is 16 MB (hello ran with the 2 MB header default)
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+# we register our own handlers in main; IDF CI runs with this off too
+CONFIG_ETHERNET_DEFAULT_EVENT_HANDLER=n
+# step 4: TLS 1.3 ONLY (design law; F6 old-client tail accepted).
+# v6.0.2 quirk: MBEDTLS_TLS_ENABLED force-selects PROTO_TLS1_2, so 1.2 cannot be
+# compiled out - instead we starve it: every TLS1.2 key exchange disabled below,
+# TLS1.3 runs on its own KEXM_EPHEMERAL. A 1.2 ClientHello finds zero ciphersuites.
+CONFIG_ESP_HTTPS_SERVER_ENABLE=y
+CONFIG_MBEDTLS_SSL_PROTO_TLS1_3=y
+CONFIG_MBEDTLS_SSL_TLS1_3_KEXM_EPHEMERAL=y
+CONFIG_MBEDTLS_KEY_EXCHANGE_PSK=n
+CONFIG_MBEDTLS_KEY_EXCHANGE_ECDHE_PSK=n
+CONFIG_MBEDTLS_KEY_EXCHANGE_RSA_PSK=n
+CONFIG_MBEDTLS_KEY_EXCHANGE_RSA=n
+# check_config demands one 1.2 kex from its list; ECDHE_RSA needs an RSA server
+# cert and ours is EC-only, so TLS 1.2 clients still find zero usable suites
+CONFIG_MBEDTLS_KEY_EXCHANGE_ECDHE_RSA=y
+CONFIG_MBEDTLS_KEY_EXCHANGE_ECDHE_ECDSA=n
+CONFIG_MBEDTLS_KEY_EXCHANGE_ECJPAKE=n
+# step 5: wire silence (review F1) - IPv6 does not exist on this node
+CONFIG_LWIP_IPV6=n
+# dual-OTA 16MB partition layout (the 1MB factory default was 96% full)
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+# three httpd instances (443 + 8443 + port-80 signpost): 10 sockets was too few
+# raised 16 -> 24 on 2026-08-02: the public server went to 8 sockets for
+# keep-alive, and 8 + 2 admin + 2 redirect needs headroom above it.
+# raised 24 -> 40 on 2026-08-07 (doc 36): a splicing leader adds a listener
+# plus 2 sockets per pair (8 pairs = 17), and 12 + 17 overflows 24.
+# 2026-08-07 (doc 36 phase 2): a splicing leader adds a listener plus 2 sockets
+# per pair (12 pairs = 25) on top of httpd 8 + admin 2 + :80 2. NOTE: no trailing
+# comments on these lines - a "CONFIG_X=48  # why" line is INVALID and silently
+# leaves the Kconfig default in force (this exact line shipped as 10 for one
+# build), which is the 2026-08-06 perf-landmine shape all over again.
+CONFIG_LWIP_MAX_SOCKETS=48
+
+# PACKET QUEUES. The splicing leader is the only node holding TWO sockets per
+# request, so it meets these limits first: 6 pairs = 12 bulk sockets feeding one
+# tcpip thread. A full mailbox is a SILENT FRAME DROP, and TCP then recovers on
+# RTO timescales - which is exactly the 2.8-4.7 s body transfers measured on
+# 2026-08-07 while both cores sat >80% idle.
+# TCP CONTROL BLOCKS: left at the default 16 ON PURPOSE. Raising it to 64 to
+# support a deeper listen backlog (iterations 11-13) made throughput collapse -
+# 0/48 served at one point, with the leader's first-byte latency climbing to
+# 6.2 s - while the fleet itself stayed perfectly healthy on single requests.
+# More PCBs let more connections in than the relay can carry, and the queue
+# becomes the failure. Refusing early is the feature.
+CONFIG_LWIP_TCPIP_RECVMBOX_SIZE=64
+CONFIG_LWIP_TCP_RECVMBOX_SIZE=32
+
+# TCP WINDOWS: left at the lwIP defaults ON PURPOSE, 2026-08-07.
+# Raising them to 23040 (16 x MSS) to "let the whole page fly at once" made
+# single requests through the splicer THREE TIMES SLOWER - 798 ms to 2263 ms -
+# with both cores 80% idle, which is the signature of retransmission, not work.
+# The W5500 holds 16 KB TOTAL in MACRAW mode, so a 23 KB burst overruns the NIC
+# itself and TCP recovers on RTO timescales. The stock window is not a legacy
+# default here; it is matched to the buffer this hardware actually has. If this
+# is ever revisited, measure single-request latency FIRST - throughput at
+# concurrency hides the stall.
+# 2026-07-31: MBEDTLS_DYNAMIC_BUFFER was tried here and REVERTED the same day.
+# The theory was sound (free the ~20.5 KB of TLS record buffers between records
+# to save internal SRAM - a motive PSRAM has since removed anyway) but the
+# practice was a PANIC crash-loop on N1 within
+# minutes of the OTA - the leader is the only node doing real public TLS 1.3
+# work, and IDF's dynamic-buffer shim predates TLS 1.3 serving. Followers idled
+# fine, which is exactly why a follower canary could not catch it. Do not re-try
+# without an IDF release-note saying TLS 1.3 server support landed.
+# CONFIG_MBEDTLS_DYNAMIC_BUFFER is not set
+# 2026-08-02: panic post-mortems land in flash (the coredump partition carved
+# from the unused assets region). Read back: GET :8443/coredump -> espcoredump.py.
+CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH=y
+CONFIG_ESP_COREDUMP_DATA_FORMAT_ELF=y
+CONFIG_ESP_COREDUMP_CHECKSUM_CRC32=y
+# 2026-08-02: measure where the CPU goes (GET :8443/cpu). The load test showed a
+# flat 1.2 req/s ceiling regardless of client count - this proves whether that is
+# one task saturating one core while the second core idles.
+CONFIG_FREERTOS_USE_TRACE_FACILITY=y
+CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS=y
+CONFIG_FREERTOS_VTASKLIST_INCLUDE_COREID=y
+# D8 (2026-08-02): an OTA'd image boots PENDING_VERIFY and is rolled back by the
+# bootloader unless main/selftest.c proves it can serve. Two releases in three
+# days bricked their own delivery path; this is the net under that wire.
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
+
+# ── PERFORMANCE + TLS, pinned here 2026-08-06 ────────────────────────────────
+# These three landed on 2026-08-02 but lived ONLY in the generated (gitignored)
+# build.lilygo/sdkconfig, so the running fleet's configuration was unreproducible
+# from a clean checkout - and a fresh `idf.py build` regenerated 160 MHz, no
+# PSRAM, and NO server session tickets. That last one is not a slow build, it is
+# a BRICK: serve.c sets pub.session_tickets = true unconditionally, and without
+# the Kconfig partner httpd_ssl_start FAILS, which is byte-for-byte the N4
+# no-door incident of 2026-08-02 that D8 was written to survive. Tracked now.
+
+# 240 MHz (S3 rating). The load test's flat ceiling was one task doing P-256 at
+# 160; the clock was the cheapest half of the answer.
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
+
+# TLS session tickets: without these EVERY visitor, including returning ones,
+# pays a full ~500 ms P-256 handshake. Both halves are required - the runtime
+# flag in serve.c AND this Kconfig - or the server does not start at all.
+CONFIG_ESP_TLS_SERVER_SESSION_TICKETS=y
+CONFIG_ESP_TLS_SERVER_SESSION_TICKET_TIMEOUT=86400

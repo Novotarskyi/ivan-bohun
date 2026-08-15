@@ -1,0 +1,19 @@
+# bohun 16 MB layout: dual OTA slots so firmware travels over the network.
+# 2026-08-02: the never-mounted 3.9 MB assets region donates 320 KB to memory -
+#   coredump (64 KB)  = full panic post-mortems (espcoredump.py reads them via
+#                       GET :8443/coredump), and
+#   blackbox (256 KB) = the flight recorder ring, 4096 events surviving reboot
+#                       (GET :8443/blackbox). Born of the one 500 nobody could
+#                       explain after 24 h of clean serving.
+# NVS/otadata/app slots are BYTE-IDENTICAL to the previous table: a hand-flash
+# of this table does not move the app, and OTA compatibility is unchanged.
+# Partition-table changes do NOT travel over OTA - USB per blade, one at a time.
+# Name,    Type, SubType,  Offset,   Size
+nvs,       data, nvs,      0x9000,   0x6000
+otadata,   data, ota,      0xf000,   0x2000
+phy_init,  data, phy,      0x11000,  0x1000
+ota_0,     app,  ota_0,    0x20000,  0x600000
+ota_1,     app,  ota_1,    0x620000, 0x600000
+coredump,  data, coredump, 0xc20000, 0x10000
+blackbox,  data, 0x06,     0xc30000, 0x40000
+assets,    data, spiffs,   0xc70000, 0x390000

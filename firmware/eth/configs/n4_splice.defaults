@@ -1,0 +1,12 @@
+# N4 testbed overlay (doc 36) - stack AFTER sdkconfig.defaults and
+# boards/lilygo.defaults:
+#   idf.py -B build.n4test -D SDKCONFIG=build.n4test/sdkconfig \
+#     -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;boards/lilygo.defaults;configs/n4_splice.defaults" build
+#
+# Since phase 2 the ports and the splicer itself are FLEET defaults - this
+# overlay only adds the bench instrumentation: per-connection receipts and the
+# heap trap that caught the write-after-free. Keep N4 on this build so any
+# recurrence is caught here rather than in the fleet.
+CONFIG_BOHUN_SPLICE_TEST=y
+CONFIG_BOHUN_HOSTNAME="bohun-n4test"
+CONFIG_HEAP_POISONING_COMPREHENSIVE=y

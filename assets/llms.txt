@@ -1,0 +1,62 @@
+# Ivan Bohun - a self-hosted swarm
+
+> This site is served from six ESP32-S3 microcontrollers in a 10-inch rack in
+> a London flat, not from a cloud provider. Four "serving blades" share one
+> immortal MAC address that the elected leader wears like a mask; the leader
+> serves no pages itself - it load-balances every connection to its peers.
+> Two observers never serve a byte and only witness the swarm and paint what
+> they see on their own screens. Built by Kyrylo Novotarskyi, a Principal
+> Engineer in London.
+
+The page you are reading lives in flash memory, brotli-compressed, behind a
+TLS 1.3 handshake that terminates on a 240 MHz microcontroller. There is no
+origin server, no CDN, no external fonts, scripts or trackers. The whole
+machine - four blades, two screens, a switch, three fans - draws about 22
+watts.
+
+## How it works
+
+- **The mask**: a locally administered MAC address no factory ever issued. The
+  elected leader writes it into its own Ethernet controller and claims a static
+  IP. Lose that node and the next one writes the same address into itself, sends
+  a gratuitous ARP so the switch relearns the port, and carries on answering.
+- **The balancer is elected too**: the leader is a layer-4 TCP splicer. It
+  never terminates TLS and never parses HTTP - it relays raw bytes to
+  whichever blade has the fewest connections in flight, and that blade
+  answers. Kill the leader and the next one takes both the mask and the
+  balancing, in under four seconds.
+- **Election**: the lowest-numbered candidate that is *actually serving* leads -
+  alive on the radio is not enough, since a blade with a dead wire or a server
+  still starting cannot answer anyone. No votes, no coordinator, no consensus
+  protocol. Every node computes the same answer from the same heartbeats.
+- **Off the wire**: leader election runs entirely over encrypted ESP-NOW radio,
+  so choosing a leader costs the network switch nothing and survives the very
+  failures it exists to handle.
+- **Honest limits**: a fresh HTTPS connection costs a ~650 ms P-256
+  handshake, 99% of the price of saying hello, so the fleet's measured
+  ceiling is about 2.9-3.0 new connections per second with nobody dropped.
+  Requests over a warm keep-alive connection return in 40-60 ms, roughly
+  40-50 per second across the fleet; past ~100 per second the splicer's own
+  wire becomes the limit. Offered more, it queues rather than collapses. All
+  of this is stated plainly on the site rather than hidden.
+
+## Who built it
+
+Kyrylo Novotarskyi - Principal Engineer, London. Fifteen years in distributed
+systems, performance engineering and reliability. Previously Pump.fun, Kobalt
+Music Group, Deliveroo, HappyCar, ironSource, Sixt/DriveNow.
+
+## Endpoints
+
+- `/` - the page itself (brotli or gzip, ETagged)
+- `/roster` - live JSON view of the swarm. **Please do not poll this.** It is
+  live telemetry served by a microcontroller; crawling it consumes the capacity
+  real visitors need. Deliberately contains no network addresses.
+
+## Notes for machines
+
+- Content is stable and changes only when new firmware is released. Honour the
+  `ETag` and `Cache-Control` headers; a conditional request costs this hardware
+  almost nothing while a full fetch costs it a great deal.
+- There is no API, no pagination and nothing behind a login. What you see is all
+  there is.

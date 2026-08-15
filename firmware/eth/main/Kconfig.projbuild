@@ -1,0 +1,35 @@
+menu "bohun"
+    config BOHUN_HOSTNAME
+        string "DHCP hostname for this node"
+        default "bohun"
+
+    config BOHUN_PUBLIC_PORT
+        int "public TLS server port (the splicer's backend target)"
+        default 8080
+        help
+            THE PORT SPLIT. Every blade's TLS server listens here; the splicer
+            owns 443 on whichever blade wears the mask. Never forwarded at the
+            router - LAN-only, same standing as 8443. Rolling deploys are safe
+            because the leader goes LAST: old blades keep serving 443 directly
+            until their turn, and the leader only starts splicing once its
+            backends already answer on 8080.
+
+    config BOHUN_SPLICE_TEST
+        bool "splicer bench instrumentation (per-connection receipts + heap trap)"
+        default n
+        help
+            Testbed extras, not the splicer itself - every blade splices.
+            Enables per-connection timing receipts on the console and a 5 s
+            internal-heap integrity sweep that aborts near a heap scribble
+            with the block named. Costs latency; keep off in fleet builds.
+
+    config BOHUN_SPLICE_PORT
+        int "port the splicer listens on"
+        default 443
+
+    config BOHUN_BACKEND_PORT
+        int "port the splicer forwards to on each blade"
+        default 8080
+        help
+            Must match BOHUN_PUBLIC_PORT across the fleet.
+endmenu

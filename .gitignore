@@ -1,0 +1,55 @@
+# ── secrets: NEVER commit ───────────────────────────────────────────────────
+# The TLS private key is EMBED_TXTFILES'd into the app image, so the build
+# artifacts below are secret-bearing too. Rotate anything that ever slipped:
+# git history remembers, and a public push is a disclosure, not a mistake.
+firmware/*/main/certs/
+firmware/*/main/secrets.h
+*.pem
+*.key
+secrets/
+
+# ── build output (also contains the embedded key + OTA key + PMK/LMK) ───────
+firmware/**/build/
+firmware/**/build.*/
+firmware/*/managed_components/
+*.bin
+*.elf
+*.map
+!firmware/mission/main/arms_84x104.bin
+
+# ── per-machine config, not source ──────────────────────────────────────────
+sdkconfig
+sdkconfig.old
+sdkconfig\ [0-9]*
+!sdkconfig.defaults
+dependencies.lock
+
+# ── editor / OS ─────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+.DS_Store
+
+# ── generated page embeds ────────────────────────────────────────────────────
+# Only the two personal.html encodings stay out: README step 4 regenerates
+# them from assets/personal.html, and every builder replaces the page anyway.
+# llms.txt / robots.txt / og.png / the favicon encodings SHIP - they are
+# public-served content and og.png has no in-repo generator.
+firmware/eth/main/personal.html.gz
+firmware/eth/main/personal.html.br
+# page_strip.bin is 12 MB of baked RGB565 and regenerates from the live page
+# (firmware/mission/render_page_asset.py); the 4-line header it emits ships,
+# so a fresh clone compiles before its first render.
+firmware/mission/main/page_strip.bin
+docs/**/diagrams/_*.html
+docs/**/diagrams/_*.png
+
+# ── stray tool venvs (regenerate: python3 -m venv, pip install matplotlib) ──
+docs/**/diagvenv/
+**/venv/
+
+# ── personal/ stays local ───────────────────────────────────────────────────
+# The archive (raw logs, superseded drafts, ops evidence with the flat's real
+# LAN addresses, retired diagrams and their render scripts) and the writing
+# live under personal/ and never ship. The public repo is the live docs +
+# firmware + tools only.
+personal/

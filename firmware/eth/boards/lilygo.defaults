@@ -1,0 +1,25 @@
+# LILYGO T-ETH-Lite S3 - ONE build for all four nodes (identity from eFuse via the ledger)
+# pins SCHEMATIC-VERIFIED 2026-07-22 (sheet 1, 22R series)
+CONFIG_ETHERNET_SPI_SCLK_GPIO=10
+CONFIG_ETHERNET_SPI_MOSI_GPIO=12
+CONFIG_ETHERNET_SPI_MISO_GPIO=11
+CONFIG_ETHERNET_SPI_CS0_GPIO=9
+CONFIG_ETHERNET_SPI_INT0_GPIO=13
+CONFIG_ETHERNET_SPI_PHY_RST0_GPIO=14
+
+# ── PSRAM, pinned here 2026-08-06 (board-specific: the T-ETH-Lite S3 carries
+# 8 MB octal PSRAM; keep it out of the shared defaults so a board without it
+# still builds). Effect measured 2026-08-02: the TLS record buffers moved off
+# internal SRAM, the heap floor went from ~67 KB to ~8.34 MB, HEAPLOW events
+# stopped entirely, and the public server could afford 8 keep-alive sockets
+# where 4 had been the ceiling.
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_TYPE_AUTO=y
+CONFIG_SPIRAM_SPEED_40M=y
+CONFIG_SPIRAM_USE_MALLOC=y
+CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=4096
+CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=32768
+CONFIG_SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY=y
+# a board that turns out not to have it must still boot, not brick
+CONFIG_SPIRAM_IGNORE_NOTFOUND=y

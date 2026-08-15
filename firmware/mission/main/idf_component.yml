@@ -1,0 +1,3 @@
+dependencies:
+  esp_lvgl_port: "^2"
+  espressif/esp_lcd_touch_gt911: "^1"

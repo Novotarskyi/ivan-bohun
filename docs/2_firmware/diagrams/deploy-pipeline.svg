@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 560" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">
+<rect width="1100" height="560" fill="#0a0a0c"/>
+<defs><marker id="dp" markerWidth="8" markerHeight="8" refX="6.5" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#7a7880"/></marker></defs>
+<text x="28" y="40" font-size="18" fill="#c4f04d">THE DEPLOY - followers first, leader last, no way to brick the door</text>
+<text x="28" y="62" font-size="11" fill="#7a7880">first law, bought with a real brick: a release must never brick its own delivery path</text>
+<rect x="28" y="100" width="150" height="96" rx="4" fill="#111115" stroke="#a8a6a3" stroke-width="1.6"/>
+<text x="103.0" y="122" font-size="12" fill="#a8a6a3" text-anchor="middle">BUILD</text>
+<text x="103.0" y="140" font-size="10" fill="#a8a6a3" text-anchor="middle">page recompressed</text>
+<text x="103.0" y="155" font-size="10" fill="#a8a6a3" text-anchor="middle">idf.py per-board</text>
+<text x="103.0" y="170" font-size="10" fill="#a8a6a3" text-anchor="middle">defaults matter</text>
+<rect x="218" y="100" width="190" height="96" rx="4" fill="#111115" stroke="#43e86a" stroke-width="1.6"/>
+<text x="313.0" y="122" font-size="12" fill="#43e86a" text-anchor="middle">FOLLOWERS</text>
+<text x="313.0" y="140" font-size="10" fill="#a8a6a3" text-anchor="middle">one at a time</text>
+<text x="313.0" y="155" font-size="10" fill="#a8a6a3" text-anchor="middle">the public face keeps</text>
+<text x="313.0" y="170" font-size="10" fill="#a8a6a3" text-anchor="middle">serving the old image</text>
+<rect x="448" y="100" width="190" height="96" rx="4" fill="#111115" stroke="#c4f04d" stroke-width="1.6"/>
+<text x="543.0" y="122" font-size="12" fill="#c4f04d" text-anchor="middle">LEADER LAST</text>
+<text x="543.0" y="140" font-size="10" fill="#a8a6a3" text-anchor="middle">only after every</text>
+<text x="543.0" y="155" font-size="10" fill="#a8a6a3" text-anchor="middle">follower proved the</text>
+<text x="543.0" y="170" font-size="10" fill="#a8a6a3" text-anchor="middle">new image</text>
+<rect x="678" y="100" width="180" height="96" rx="4" fill="#111115" stroke="#43e86a" stroke-width="1.6"/>
+<text x="768.0" y="122" font-size="12" fill="#43e86a" text-anchor="middle">FLEET CHECK</text>
+<text x="768.0" y="140" font-size="10" fill="#a8a6a3" text-anchor="middle">4/4 PASS required:</text>
+<text x="768.0" y="155" font-size="10" fill="#a8a6a3" text-anchor="middle">page 200, OTA closed,</text>
+<text x="768.0" y="170" font-size="10" fill="#a8a6a3" text-anchor="middle">hashes identical</text>
+<rect x="898" y="100" width="174" height="96" rx="4" fill="#111115" stroke="#c4f04d" stroke-width="1.6"/>
+<text x="985.0" y="122" font-size="12" fill="#c4f04d" text-anchor="middle">RELEASE</text>
+<text x="985.0" y="140" font-size="10" fill="#a8a6a3" text-anchor="middle">idempotent re-run</text>
+<text x="985.0" y="155" font-size="10" fill="#a8a6a3" text-anchor="middle">skips blades already</text>
+<text x="985.0" y="170" font-size="10" fill="#a8a6a3" text-anchor="middle">on the target</text>
+<path d="M178,148 L218,148" stroke="#7a7880" stroke-width="2" marker-end="url(#dp)"/>
+<path d="M408,148 L448,148" stroke="#7a7880" stroke-width="2" marker-end="url(#dp)"/>
+<path d="M638,148 L678,148" stroke="#7a7880" stroke-width="2" marker-end="url(#dp)"/>
+<path d="M858,148 L898,148" stroke="#7a7880" stroke-width="2" marker-end="url(#dp)"/>
+<text x="28" y="256" font-size="13" fill="#e8e6e3">PER NODE, EVERY TIME:</text>
+<rect x="28" y="276" width="240" height="88" rx="4" fill="#111115" stroke="#43e86a" stroke-width="1.6"/>
+<text x="148.0" y="298" font-size="12" fill="#43e86a" text-anchor="middle">G1 TRANSFER</text>
+<text x="148.0" y="316" font-size="10" fill="#a8a6a3" text-anchor="middle">curl 200, body says</text>
+<text x="148.0" y="331" font-size="10" fill="#a8a6a3" text-anchor="middle">"ok, rebooting"</text>
+<rect x="292" y="276" width="240" height="88" rx="4" fill="#111115" stroke="#43e86a" stroke-width="1.6"/>
+<text x="412.0" y="298" font-size="12" fill="#43e86a" text-anchor="middle">G2 REBOOT</text>
+<text x="412.0" y="316" font-size="10" fill="#a8a6a3" text-anchor="middle">uptime resets -</text>
+<text x="412.0" y="331" font-size="10" fill="#a8a6a3" text-anchor="middle">the node really cycled</text>
+<path d="M268,320 L292,320" stroke="#7a7880" stroke-width="2" marker-end="url(#dp)"/>
+<rect x="556" y="276" width="240" height="88" rx="4" fill="#111115" stroke="#43e86a" stroke-width="1.6"/>
+<text x="676.0" y="298" font-size="12" fill="#43e86a" text-anchor="middle">G3 NEW BUILD</text>
+<text x="676.0" y="316" font-size="10" fill="#a8a6a3" text-anchor="middle">X-Bohun-Build</text>
+<text x="676.0" y="331" font-size="10" fill="#a8a6a3" text-anchor="middle">differs from before</text>
+<path d="M532,320 L556,320" stroke="#7a7880" stroke-width="2" marker-end="url(#dp)"/>
+<rect x="820" y="276" width="240" height="88" rx="4" fill="#111115" stroke="#ffb020" stroke-width="1.6"/>
+<text x="940.0" y="298" font-size="12" fill="#ffb020" text-anchor="middle">G4 THE TRIAL (D8)</text>
+<text x="940.0" y="316" font-size="10" fill="#a8a6a3" text-anchor="middle">90 s continuous serving</text>
+<text x="940.0" y="331" font-size="10" fill="#a8a6a3" text-anchor="middle">within a 300 s deadline</text>
+<path d="M796,320 L820,320" stroke="#7a7880" stroke-width="2" marker-end="url(#dp)"/>
+<rect x="28" y="416" width="1044" height="100" rx="4" fill="#111115" stroke="#ff5555" stroke-width="1.4"/>
+<rect x="28" y="416" width="4" height="100" fill="#ff5555"/>
+<text x="52" y="444" font-size="12" fill="#ff5555">IF THE TRIAL FAILS - or power dies mid-trial:</text>
+<text x="52" y="466" font-size="11" fill="#e8e6e3">the bootloader boots the PREVIOUS slot. No hands, no USB, no drama. The deploy tool
+</text>
+<text x="52" y="484" font-size="11" fill="#e8e6e3">polls each node's published on_trial flag instead of sleeping and hoping.</text>
+<text x="52" y="506" font-size="10" fill="#7a7880">proven twice: once by deliberately shipping garbage, once by real power pulls mid-trial - every interrupted node came back on the old image, serving</text>
+<path d="M916,364 C916,394 800,400 700,412" fill="none" stroke="#ff5555" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#dp)"/>
+</svg>

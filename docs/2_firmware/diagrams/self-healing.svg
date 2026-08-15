@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 380" role="img" aria-label="Diagram of two self-healing mechanisms shown side by side. On the left, self-probing: a blade opens a TCP connection to its own public port on loopback every 7 seconds; after two failures in a row it reports itself as not serving, stops participating in leader election, and the load balancer benches it within 2 seconds; after six failures in a row it crashes on purpose, so the coredump records where its server was stuck, then reboots. On the right, circuit breaking: the otaman splicer fans connections out to backends n2 and n4 while a dashed, muted line shows n3 skipped; n3 sits on the bench because it accepted connections and returned nothing three times running, benched 15 seconds and doubling on repeat up to a 4 minute cap, forgiven at once by any byte returned. A band across the bottom states the principle: benched blades are skipped when picking a backend, but if every backend is benched one is picked anyway."><rect x="0.0" y="0.0" width="720.0" height="380.0" fill="#0a0a0c"/>
+        <defs>
+          <marker id="sh-ah" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 z" fill="#c4f04d"/>
+          </marker>
+          <marker id="sh-ahd" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 z" fill="#4a4850"/>
+          </marker>
+          <marker id="sh-ahw" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 z" fill="#ffb020"/>
+          </marker>
+          <marker id="sh-ahg" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 z" fill="#43e86a"/>
+          </marker>
+        </defs>
+        <g font-family="ui-monospace,SFMono-Regular,Menlo,monospace">
+
+          <!-- ==================== LEFT PANEL: THE SELF-PROBE ==================== -->
+          <rect x="8" y="8" width="340" height="298" rx="3" fill="#111115" stroke="#1e1e25"/>
+          <text x="24" y="30" fill="#c4f04d" font-size="12">self-probing</text>
+          <text x="24" y="45" fill="#7a7880" font-size="9">runs on every blade</text>
+          <line x1="24" y1="52" x2="332" y2="52" stroke="#1e1e25" stroke-width="1"/>
+
+          <!-- the blade, asking itself -->
+          <rect x="24" y="64" width="132" height="54" rx="3" fill="#16161c" stroke="#c4f04d" stroke-width="1.5"/>
+          <circle cx="42" cy="84" r="4" fill="#43e86a"/>
+          <text x="54" y="88" fill="#e8e6e3" font-size="11">a blade</text>
+          <text x="34" y="106" fill="#4a4850" font-size="9">every 7 seconds</text>
+
+          <!-- self-loop: it asks itself -->
+          <path d="M156,80 C 192,72 192,110 158,102" fill="none" stroke="#c4f04d" stroke-width="1.2" marker-end="url(#sh-ah)"/>
+
+          <text x="204" y="74" fill="#e8e6e3" font-size="9">opens a tcp connection</text>
+          <text x="204" y="86" fill="#e8e6e3" font-size="9">to its own public port,</text>
+          <text x="204" y="98" fill="#e8e6e3" font-size="9">over loopback</text>
+
+          <!-- escalation arrow 1 -->
+          <line x1="90" y1="122" x2="90" y2="136" stroke="#4a4850" stroke-width="1.2" stroke-dasharray="3 3" marker-end="url(#sh-ahd)"/>
+
+          <!-- step: 2 failures -->
+          <rect x="24" y="140" width="308" height="60" rx="3" fill="#16161c" stroke="#ffb020"/>
+          <text x="40" y="163" fill="#ffb020" font-size="11">2 in a row</text>
+          <text x="40" y="178" fill="#4a4850" font-size="9">14 seconds</text>
+          <line x1="124" y1="148" x2="124" y2="196" stroke="#1e1e25" stroke-width="1"/>
+          <text x="138" y="153" fill="#e8e6e3" font-size="9">reports itself as not serving and</text>
+          <text x="138" y="166" fill="#e8e6e3" font-size="9">does not participate in leader</text>
+          <text x="138" y="179" fill="#e8e6e3" font-size="9">election. the load balancer</text>
+    <text x="138" y="192" fill="#e8e6e3" font-size="9">benches the blade within 2 s.</text>
+
+          <!-- escalation arrow 2 -->
+          <line x1="90" y1="206" x2="90" y2="218" stroke="#4a4850" stroke-width="1.2" stroke-dasharray="3 3" marker-end="url(#sh-ahd)"/>
+
+          <!-- step: 6 failures -->
+          <rect x="24" y="222" width="308" height="62" rx="3" fill="#16161c" stroke="#ff5555"/>
+          <text x="40" y="248" fill="#ff5555" font-size="11">6 in a row</text>
+          <text x="40" y="263" fill="#4a4850" font-size="9">42 seconds</text>
+          <line x1="124" y1="230" x2="124" y2="276" stroke="#1e1e25" stroke-width="1"/>
+          <text x="138" y="240" fill="#e8e6e3" font-size="9">it crashes on purpose, so the</text>
+          <text x="138" y="253" fill="#e8e6e3" font-size="9">coredump records where its server</text>
+          <text x="138" y="266" fill="#43e86a" font-size="9">was stuck, then reboots.</text>
+
+          <!-- ==================== RIGHT PANEL: THE CIRCUIT BREAKER ==================== -->
+          <rect x="372" y="8" width="340" height="298" rx="3" fill="#111115" stroke="#1e1e25"/>
+          <text x="388" y="30" fill="#c4f04d" font-size="12">circuit breaker</text>
+          <text x="388" y="45" fill="#7a7880" font-size="9">runs on the balancer</text>
+          <line x1="388" y1="52" x2="696" y2="52" stroke="#1e1e25" stroke-width="1"/>
+
+          <!-- the balancer -->
+          <rect x="447" y="62" width="190" height="46" rx="3" fill="#16161c" stroke="#c4f04d" stroke-width="1.5"/>
+          <circle cx="465" cy="76" r="4" fill="#c4f04d"/>
+          <text x="477" y="80" fill="#e8e6e3" font-size="11">the otaman · splicer</text>
+          <text x="465" y="96" fill="#7a7880" font-size="9">counts what comes back</text>
+
+          <!-- fan-out: two served, one skipped -->
+          <path d="M542,108 L542,124 L436,124 L436,134" fill="none" stroke="#c4f04d" stroke-width="1.2" marker-end="url(#sh-ah)"/>
+          <path d="M542,108 L542,134" fill="none" stroke="#4a4850" stroke-width="1.2" stroke-dasharray="3 3" marker-end="url(#sh-ahd)"/>
+          <path d="M542,108 L542,124 L648,124 L648,134" fill="none" stroke="#c4f04d" stroke-width="1.2" marker-end="url(#sh-ah)"/>
+
+          <!-- backends -->
+          <rect x="388" y="140" width="96" height="56" rx="3" fill="#16161c" stroke="#2a2a33"/>
+          <circle cx="404" cy="158" r="4" fill="#43e86a"/>
+          <text x="416" y="162" fill="#e8e6e3" font-size="11">n2</text>
+          <text x="398" y="181" fill="#4a4850" font-size="9">serving</text>
+
+          <rect x="494" y="140" width="96" height="56" rx="3" fill="#16161c" stroke="#ffb020"/>
+          <circle cx="510" cy="158" r="4" fill="#ffb020"/>
+          <text x="522" y="162" fill="#e8e6e3" font-size="11">n3</text>
+          <text x="504" y="181" fill="#ffb020" font-size="9">benched</text>
+
+          <rect x="600" y="140" width="96" height="56" rx="3" fill="#16161c" stroke="#2a2a33"/>
+          <circle cx="616" cy="158" r="4" fill="#43e86a"/>
+          <text x="628" y="162" fill="#e8e6e3" font-size="11">n4</text>
+          <text x="610" y="181" fill="#4a4850" font-size="9">serving</text>
+
+          <!-- onto the bench, and off it -->
+          <line x1="515" y1="198" x2="515" y2="218" stroke="#ffb020" stroke-width="1.2" marker-end="url(#sh-ahw)"/>
+          <line x1="570" y1="218" x2="570" y2="198" stroke="#43e86a" stroke-width="1.2" marker-end="url(#sh-ahg)"/>
+
+          <!-- the bench -->
+          <rect x="420" y="220" width="276" height="56" rx="3" fill="#0e0e12" stroke="#ffb020" stroke-dasharray="3 3"/>
+          <text x="436" y="241" fill="#ffb020" font-size="11">the bench</text>
+          <line x1="530" y1="228" x2="530" y2="268" stroke="#1e1e25" stroke-width="1"/>
+          <text x="546" y="238" fill="#e8e6e3" font-size="9">in: 3 empty replies</text>
+          <text x="546" y="251" fill="#43e86a" font-size="9">out: any byte, at once</text>
+          <text x="546" y="264" fill="#ffb020" font-size="9">15 s, doubling, 4 min cap</text>
+
+          <!-- ==================== THE PRINCIPLE ==================== -->
+          <rect x="8" y="316" width="704" height="56" rx="3" fill="#16161c" stroke="#2a2a33"/>
+          <line x1="10" y1="319" x2="10" y2="369" stroke="#c4f04d" stroke-width="3"/>
+          <text x="360" y="341" fill="#7a7880" font-size="12" text-anchor="middle">benched blades are <tspan fill="#c4f04d">skipped</tspan> when picking a backend</text>
+          <text x="360" y="358" fill="#4a4850" font-size="9" text-anchor="middle">if every backend is benched, one is picked anyway - the bench never turns a visitor away</text>
+        </g>
+      </svg>

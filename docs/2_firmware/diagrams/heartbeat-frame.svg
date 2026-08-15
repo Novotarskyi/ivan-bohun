@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1060 470" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">
+<rect width="1060" height="470" fill="#0a0a0c"/>
+<text x="28" y="40" font-size="18" fill="#c4f04d">THE HEARTBEAT - one 132-byte frame, every member, every second</text>
+<text x="28" y="62" font-size="12" fill="#7a7880">encrypted ESP-NOW broadcast - the whole control plane rides these frames, never the wire they protect</text>
+<rect x="40.0" y="100" width="160.3" height="44" rx="4" fill="#111115" stroke="#c4f04d" stroke-width="1.4"/>
+<text x="120.2" y="127" font-size="11.5" fill="#c4f04d" text-anchor="middle">22 B</text>
+<rect x="40.0" y="190" width="151.7" height="150" rx="6" fill="#111115" stroke="#c4f04d" stroke-width="1.4"/>
+<text x="115.8" y="214" font-size="12" fill="#c4f04d" text-anchor="middle">IDENTITY</text>
+<text x="115.8" y="238" font-size="10.5" fill="#a8a6a3" text-anchor="middle">magic + version</text>
+<text x="115.8" y="254" font-size="10.5" fill="#a8a6a3" text-anchor="middle">fleet id, sequence</text>
+<text x="115.8" y="270" font-size="10.5" fill="#a8a6a3" text-anchor="middle">uptime, address,</text>
+<text x="115.8" y="286" font-size="10.5" fill="#a8a6a3" text-anchor="middle">generation</text>
+<path d="M 120.2 144 C 120.2 168, 115.8 166, 115.8 190" fill="none" stroke="#c4f04d" stroke-width="1" opacity="0.55"/>
+<rect x="203.3" y="100" width="338.5" height="44" rx="4" fill="#111115" stroke="#43e86a" stroke-width="1.4"/>
+<text x="372.6" y="127" font-size="11.5" fill="#43e86a" text-anchor="middle">46 B</text>
+<rect x="205.7" y="190" width="151.7" height="150" rx="6" fill="#111115" stroke="#43e86a" stroke-width="1.4"/>
+<text x="281.5" y="214" font-size="12" fill="#43e86a" text-anchor="middle">WORK</text>
+<text x="281.5" y="238" font-size="10.5" fill="#a8a6a3" text-anchor="middle">requests served,</text>
+<text x="281.5" y="254" font-size="10.5" fill="#a8a6a3" text-anchor="middle">refusals + 13</text>
+<text x="281.5" y="270" font-size="10.5" fill="#a8a6a3" text-anchor="middle">per-code tallies,</text>
+<text x="281.5" y="286" font-size="10.5" fill="#a8a6a3" text-anchor="middle">last latency,</text>
+<text x="281.5" y="302" font-size="10.5" fill="#a8a6a3" text-anchor="middle">own p50 / p95</text>
+<path d="M 372.6 144 C 372.6 168, 281.5 166, 281.5 190" fill="none" stroke="#43e86a" stroke-width="1" opacity="0.55"/>
+<rect x="544.8" y="100" width="152.9" height="44" rx="4" fill="#111115" stroke="#ffb020" stroke-width="1.4"/>
+<text x="621.3" y="127" font-size="11.5" fill="#ffb020" text-anchor="middle">21 B</text>
+<rect x="371.3" y="190" width="151.7" height="150" rx="6" fill="#111115" stroke="#ffb020" stroke-width="1.4"/>
+<text x="447.2" y="214" font-size="12" fill="#ffb020" text-anchor="middle">HEALTH</text>
+<text x="447.2" y="238" font-size="10.5" fill="#a8a6a3" text-anchor="middle">link up, serving,</text>
+<text x="447.2" y="254" font-size="10.5" fill="#a8a6a3" text-anchor="middle">reset reason,</text>
+<text x="447.2" y="270" font-size="10.5" fill="#a8a6a3" text-anchor="middle">free + min heap,</text>
+<text x="447.2" y="286" font-size="10.5" fill="#a8a6a3" text-anchor="middle">die temperature,</text>
+<text x="447.2" y="302" font-size="10.5" fill="#a8a6a3" text-anchor="middle">lwIP PCB census</text>
+<path d="M 621.3 144 C 621.3 168, 447.2 166, 447.2 190" fill="none" stroke="#ffb020" stroke-width="1" opacity="0.55"/>
+<rect x="700.8" y="100" width="26.7" height="44" rx="4" fill="#111115" stroke="#4da3ff" stroke-width="1.4"/>
+<text x="714.1" y="127" font-size="11.5" fill="#4da3ff" text-anchor="middle">4 B</text>
+<rect x="537.0" y="190" width="151.7" height="150" rx="6" fill="#111115" stroke="#4da3ff" stroke-width="1.4"/>
+<text x="612.8" y="214" font-size="12" fill="#4da3ff" text-anchor="middle">RELEASE</text>
+<text x="612.8" y="238" font-size="10.5" fill="#a8a6a3" text-anchor="middle">OTA in progress</text>
+<text x="612.8" y="254" font-size="10.5" fill="#a8a6a3" text-anchor="middle">+ percent,</text>
+<text x="612.8" y="270" font-size="10.5" fill="#a8a6a3" text-anchor="middle">firmware version</text>
+<path d="M 714.1 144 C 714.1 168, 612.8 166, 612.8 190" fill="none" stroke="#4da3ff" stroke-width="1" opacity="0.55"/>
+<rect x="730.5" y="100" width="197.5" height="44" rx="4" fill="#111115" stroke="#b06af0" stroke-width="1.4"/>
+<text x="829.2" y="127" font-size="11.5" fill="#b06af0" text-anchor="middle">27 B</text>
+<rect x="702.7" y="190" width="151.7" height="150" rx="6" fill="#111115" stroke="#b06af0" stroke-width="1.4"/>
+<text x="778.5" y="214" font-size="12" fill="#b06af0" text-anchor="middle">BALANCER</text>
+<text x="778.5" y="238" font-size="10.5" fill="#a8a6a3" text-anchor="middle">backends known,</text>
+<text x="778.5" y="254" font-size="10.5" fill="#a8a6a3" text-anchor="middle">accepted / done /</text>
+<text x="778.5" y="270" font-size="10.5" fill="#a8a6a3" text-anchor="middle">refused / killed /</text>
+<text x="778.5" y="286" font-size="10.5" fill="#a8a6a3" text-anchor="middle">idle, p50 + p95</text>
+<text x="778.5" y="302" font-size="10.5" fill="#a8a6a3" text-anchor="middle">timings, benched</text>
+<text x="778.5" y="318" font-size="10.5" fill="#a8a6a3" text-anchor="middle">bitmask</text>
+<path d="M 829.2 144 C 829.2 168, 778.5 166, 778.5 190" fill="none" stroke="#b06af0" stroke-width="1" opacity="0.55"/>
+<rect x="930.9" y="100" width="86.1" height="44" rx="4" fill="#111115" stroke="#ff5555" stroke-width="1.4"/>
+<text x="974.0" y="127" font-size="11.5" fill="#ff5555" text-anchor="middle">12 B</text>
+<rect x="868.3" y="190" width="151.7" height="150" rx="6" fill="#111115" stroke="#ff5555" stroke-width="1.4"/>
+<text x="944.2" y="214" font-size="12" fill="#ff5555" text-anchor="middle">COUNTERS</text>
+<text x="944.2" y="238" font-size="10.5" fill="#a8a6a3" text-anchor="middle">outbound-link</text>
+<text x="944.2" y="254" font-size="10.5" fill="#a8a6a3" text-anchor="middle">click counters</text>
+<path d="M 974.0 144 C 974.0 168, 944.2 166, 944.2 190" fill="none" stroke="#ff5555" stroke-width="1" opacity="0.55"/>
+<rect x="40" y="380" width="980" height="56" rx="6" fill="#111115" stroke="#2a2a33"/>
+<text x="58" y="403" font-size="12" fill="#e8e6e3">versioned + zero-filled: every reader gates each group on the frame version that introduced it,</text>
+<text x="58" y="422" font-size="12" fill="#e8e6e3">so a mixed-version fleet mid-rolling-update reads only the fields each sender actually wrote</text>
+</svg>

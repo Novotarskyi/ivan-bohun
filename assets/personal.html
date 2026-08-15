@@ -1,0 +1,2311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ivan Bohun · a website served from a shelf in London</title>
+<meta name="description" content="This page is served by a swarm of four ESP32-S3 microcontrollers in a London flat, sharing one immortal MAC address. Built by Kyrylo Novotarskyi, Principal Engineer.">
+<link rel="canonical" href="https://kyrylonovotarskyi.com/">
+<!-- Open Graph / Twitter: what a messenger renders when the link is pasted.
+     og:image is served from the same flash as everything else - no CDN. -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Ivan Bohun">
+<meta property="og:url" content="https://kyrylonovotarskyi.com/">
+<meta property="og:title" content="This page is not in the cloud.">
+<meta property="og:description" content="Served from a shelf in a London flat by six ESP32-S3 microcontrollers sharing one immortal MAC address. No AWS. No landlord. No rent.">
+<meta property="og:image" content="https://kyrylonovotarskyi.com/og.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="This page is not in the cloud - a self-hosted swarm, Kyrylo Novotarskyi, Principal Engineer, London.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="This page is not in the cloud.">
+<meta name="twitter:description" content="Served from a shelf in a London flat by six ESP32-S3 microcontrollers sharing one immortal MAC address.">
+<meta name="twitter:image" content="https://kyrylonovotarskyi.com/og.png">
+<style>
+  *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --bg:#0a0a0c;
+    --bg-card:#111115;
+    --bg-card-hover:#16161c;
+    --text:#e8e6e3;
+    --text-dim:#7a7880;
+    --text-muted:#4a4850;
+    --accent:#c4f04d;
+    --accent-dim:#8ab82a;
+    --alive:#43e86a;
+    --warn:#ffb020;
+    --lost:#ff5555;
+    --border:#1e1e25;
+    --border-light:#2a2a33;
+    /* self-hosted law: no external font requests, ever. system stacks only. */
+    --mono:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace;
+    --serif:Georgia,'Iowan Old Style','Times New Roman',serif;
+    --sans:system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',sans-serif;
+  }
+  html{scroll-behavior:smooth;background:var(--bg)}
+  body{
+    font-family:var(--sans);color:var(--text);background:var(--bg);
+    overflow-x:hidden;line-height:1.6;-webkit-font-smoothing:antialiased;
+  }
+
+  .grid-bg{
+    position:fixed;inset:0;z-index:0;pointer-events:none;
+    background-image:
+      linear-gradient(var(--border) 1px,transparent 1px),
+      linear-gradient(90deg,var(--border) 1px,transparent 1px);
+    background-size:80px 80px;
+    opacity:.25;
+    mask-image:radial-gradient(ellipse 70% 60% at 50% 30%,black 20%,transparent 70%);
+  }
+  .noise{
+    position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.035;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  .container{position:relative;z-index:2;max-width:1100px;margin:0 auto;padding:0 32px}
+
+  /* NAV */
+  nav{
+    position:fixed;top:0;left:0;right:0;z-index:100;padding:18px 0;
+    background:rgba(10,10,12,.82);backdrop-filter:blur(20px);
+    border-bottom:1px solid var(--border);
+  }
+  nav .container{display:flex;align-items:center;justify-content:space-between}
+  .nav-logo{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--accent);letter-spacing:-.02em;text-decoration:none}
+  .nav-logo:hover span{color:var(--accent)}
+  .nav-logo span{color:var(--text-dim)}
+  .nav-links{display:flex;gap:28px;list-style:none}
+  .nav-links a{
+    font-family:var(--mono);font-size:11px;color:var(--text-dim);text-decoration:none;
+    letter-spacing:.08em;text-transform:uppercase;transition:color .2s;position:relative;
+  }
+  .nav-links a::after{
+    content:'';position:absolute;left:0;bottom:-4px;width:0;height:1px;
+    background:var(--accent);transition:width .3s ease;
+  }
+  .nav-links a:hover{color:var(--text)}
+  .nav-links a:hover::after{width:100%}
+
+  /* HERO */
+  .hero{min-height:82vh;display:flex;flex-direction:column;justify-content:center;padding:76px 0 14px;position:relative}
+  .hero-pre{
+    font-family:var(--mono);font-size:12px;color:var(--accent);letter-spacing:.15em;
+    text-transform:uppercase;margin-bottom:24px;opacity:0;animation:fadeUp .8s ease forwards;
+  }
+  .hero-pre::before{content:'';display:inline-block;width:40px;height:1px;background:var(--accent);vertical-align:middle;margin-right:16px}
+  .hero h1{
+    font-family:var(--serif);font-size:clamp(44px,7.5vw,88px);font-weight:400;
+    line-height:1.02;letter-spacing:-.03em;color:var(--text);margin-bottom:28px;
+    opacity:0;animation:fadeUp .8s ease .15s forwards;
+  }
+  .hero h1 em{font-style:italic;color:var(--accent)}
+  .hero-sub{
+    font-size:17px;color:var(--text-dim);max-width:660px;line-height:1.75;font-weight:400;
+    opacity:0;animation:fadeUp .8s ease .3s forwards;
+  }
+  .hero-sub strong{color:var(--text);font-weight:500}
+  .hero-sub+.hero-sub{margin-top:15px}
+  .hero-meta{
+    display:flex;gap:44px;margin-top:44px;padding-top:28px;border-top:1px solid var(--border);
+    flex-wrap:wrap;opacity:0;animation:fadeUp .8s ease .45s forwards;
+  }
+  .hero-meta-item{display:flex;flex-direction:column;gap:4px}
+  .hero-meta-label{font-family:var(--mono);font-size:10px;color:var(--text-muted);letter-spacing:.12em;text-transform:uppercase}
+  .hero-meta-value{font-family:var(--serif);font-size:28px;font-style:italic;color:var(--text)}
+  .hero-meta-value.live{color:var(--alive)}
+
+  /* SECTIONS */
+  section{padding:28px 0}
+  .section-label{
+    font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.2em;
+    text-transform:uppercase;margin-bottom:16px;display:flex;align-items:center;gap:12px;
+  }
+  .section-label::before{content:'';width:24px;height:1px;background:var(--accent)}
+  .section-title{
+    font-family:var(--serif);font-size:clamp(32px,4.6vw,52px);font-weight:400;
+    line-height:1.15;letter-spacing:-.02em;margin-bottom:24px;
+  }
+  .section-title em{font-style:italic;color:var(--accent)}
+  .section-intro{font-size:16px;color:var(--text-dim);max-width:680px;line-height:1.8;margin-bottom:22px}
+  .section-intro code{font-family:var(--mono);font-size:13px;color:var(--accent);background:rgba(196,240,77,.07);padding:2px 6px;border-radius:2px}
+
+  /* LIVE FLEET PANEL */
+  .fleet{background:var(--bg-card);border:1px solid var(--border);position:relative;overflow:hidden}
+  .fleet-head{
+    display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+    padding:20px 26px;border-bottom:1px solid var(--border);
+  }
+  .fleet-title{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-dim)}
+  .fleet-status{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:12px;color:var(--alive)}
+  .pulse{width:8px;height:8px;border-radius:50%;background:var(--alive);box-shadow:0 0 0 0 rgba(67,232,106,.6);animation:pulse 2s infinite}
+  .pulse.off{background:var(--text-muted);animation:none;box-shadow:none}
+  /* reconnecting: still beating, but amber - the fleet is busy or handing over */
+  .pulse.warn{background:var(--warn);box-shadow:0 0 0 0 rgba(255,176,32,.6)}
+  @keyframes pulse{
+    0%{box-shadow:0 0 0 0 rgba(67,232,106,.55)}
+    70%{box-shadow:0 0 0 9px rgba(67,232,106,0)}
+    100%{box-shadow:0 0 0 0 rgba(67,232,106,0)}
+  }
+  .fleet-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:13px}
+  .fleet-table th{
+    text-align:left;font-weight:400;font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--text-muted);padding:14px 26px;border-bottom:1px solid var(--border);
+  }
+  .fleet-table td{padding:13px 26px;border-bottom:1px solid var(--border);color:var(--text-dim);white-space:nowrap}
+  .fleet-table tr:last-child td{border-bottom:none}
+  .fleet-table tr.is-leader td{background:rgba(196,240,77,.04)}
+  .node-name{color:var(--text);font-weight:500}
+  .node-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--alive);margin-right:9px;vertical-align:middle}
+  .node-dot.lost{background:var(--lost)}
+  .role-tag{font-size:11px;letter-spacing:.06em;padding:3px 9px;border:1px solid var(--border-light);border-radius:2px}
+  .role-otaman{color:var(--accent);border-color:rgba(196,240,77,.4)}
+  .role-kozak{color:var(--text-dim)}
+  .role-pysar{color:var(--text-muted)}
+  .bar{display:inline-block;width:54px;height:5px;background:var(--border-light);border-radius:3px;overflow:hidden;vertical-align:middle;margin-right:9px}
+  .bar > i{display:block;height:100%;background:var(--alive);border-radius:3px}
+  /* FOUR columns, not eight. The balancer telemetry took this row from 6 tiles
+     to 8, and squeezing 8 across the card left ~150px each: labels like
+     "Closed after stalling" wrapped into the value and the last pair clipped
+     off the edge. Eight tiles now sit as two tidy rows of four, and the latency
+     row is a third row of four - every tile the same size, nothing to clip.
+     Dividers come from a 1px gap over the border colour, which works no matter
+     how many tiles a row ends up holding. */
+  .fleet-foot{
+    display:grid;grid-template-columns:repeat(2,1fr);
+    gap:1px;background:var(--border);
+    border-top:1px solid var(--border);
+  }
+  @media(min-width:640px){ .fleet-foot{grid-template-columns:repeat(4,1fr)} }
+  .fleet-stat{padding:20px 14px;background:var(--bg-card);min-width:0}
+  .fleet-foot-lat .fleet-stat-value{font-size:22px}
+  .fleet-stat-label{font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;white-space:nowrap}
+  .fleet-stat-value{font-family:var(--serif);font-size:26px;font-style:italic;color:var(--text)}
+  .fleet-note{padding:16px 26px;font-family:var(--mono);font-size:11px;color:var(--text-muted);line-height:1.7;border-top:1px solid var(--border)}
+
+  /* DIAGRAMS */
+  .diagram{background:var(--bg-card);border:1px solid var(--border);padding:32px 26px;margin-bottom:2px}
+  .diagram svg{width:100%;height:auto;display:block;overflow:visible}
+  .diagram-cap{
+    font-family:var(--mono);font-size:11px;color:var(--text-muted);letter-spacing:.06em;
+    margin-top:22px;line-height:1.8;
+  }
+  .diagram-cap b{color:var(--text-dim);font-weight:500}
+
+  /* PROSE: the long-form explanation that sits under a diagram. Same card as the
+     diagram so a reader sees one continuous slab, not a boxed picture followed by
+     loose text. */
+  .prose{background:var(--bg-card);border:1px solid var(--border);padding:30px 26px 26px;margin-bottom:2px}
+  .prose h3{
+    font-family:var(--mono);font-size:11px;font-weight:600;color:var(--accent);
+    letter-spacing:.12em;text-transform:uppercase;margin:34px 0 12px;
+  }
+  .prose h3:first-child{margin-top:0}
+  .prose p{font-size:14.5px;color:var(--text-dim);line-height:1.85;margin:0 0 14px;max-width:76ch}
+  .prose p:last-child{margin-bottom:0}
+  .prose b,.prose strong{color:var(--text);font-weight:600}
+  @media(max-width:640px){
+    .prose{padding:24px 18px 20px}
+    .prose p{font-size:13.5px;line-height:1.8}
+  }
+
+  /* ── the glass: what the two screens actually show ── */
+  .glass-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:2px;margin-bottom:2px}
+  .glass{background:var(--bg-card);border:1px solid var(--border);padding:24px 22px 20px}
+  .glass h3{font-size:14px;color:var(--text);margin:0 0 4px;letter-spacing:.01em}
+  .glass .glass-sub{font-family:var(--mono);font-size:10.5px;color:var(--accent);letter-spacing:.14em;text-transform:uppercase;margin-bottom:16px}
+  .glass p{font-size:13.5px;color:var(--text-dim);line-height:1.75;margin:14px 0 0}
+  .glass svg{width:100%;height:auto;display:block}
+  .screen-frame{background:#07070b;border:1px solid #22222b;border-radius:4px;padding:8px}
+
+  /* ── the build: soldering ledger ── */
+  .build-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:2px;margin-bottom:2px}
+  .build-cell{background:var(--bg-card);border:1px solid var(--border);padding:20px 18px}
+  .build-cell b{display:block;font-family:var(--mono);font-size:26px;color:var(--accent);font-weight:400;line-height:1.1}
+  .build-cell span{display:block;font-size:12px;color:var(--text-dim);margin-top:6px;line-height:1.6}
+  .build-steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:2px}
+  .build-step{background:var(--bg-card);border:1px solid var(--border);padding:22px 20px}
+  .build-step .bs-n{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.16em}
+  .build-step h4{font-size:14px;color:var(--text);margin:8px 0 8px}
+  .build-step p{font-size:13px;color:var(--text-dim);line-height:1.75;margin:0}
+  @keyframes railwalk{0%,100%{opacity:.25}12%{opacity:1}}
+  .rail-dot{animation:railwalk 4.2s infinite}
+
+  /* PRINCIPLES */
+  .grid-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:2px}
+  .card{background:var(--bg-card);padding:32px 28px;border:1px solid var(--border);transition:all .35s ease;position:relative;overflow:hidden}
+  .card::before{content:'';position:absolute;top:0;left:0;width:100%;height:2px;background:var(--accent);transform:scaleX(0);transform-origin:left;transition:transform .4s ease}
+  .card:hover{background:var(--bg-card-hover);border-color:var(--border-light)}
+  .card:hover::before{transform:scaleX(1)}
+  .card h3{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--accent);letter-spacing:.1em;text-transform:uppercase;margin-bottom:14px}
+  .card p{font-size:14px;color:var(--text-dim);line-height:1.75}
+
+  /* QUOTE */
+  .quote-strip{padding:64px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);text-align:center}
+  .quote-strip blockquote{font-family:var(--serif);font-size:clamp(20px,3.05vw,35px);font-style:italic;color:var(--text);line-height:1.4;max-width:1180px;margin:0 auto;white-space:nowrap;overflow:hidden;text-overflow:clip}
+  .quote-strip blockquote em{color:var(--accent);font-style:italic}
+  .quote-attr{font-family:var(--mono);font-size:11px;color:var(--text-muted);letter-spacing:.14em;text-transform:uppercase;margin-top:26px}
+
+  /* CV */
+  .cv-row{
+    display:grid;grid-template-columns:130px 1fr;gap:28px;
+    padding:26px 0;border-bottom:1px solid var(--border);align-items:start;
+  }
+  .cv-row:last-of-type{border-bottom:none}
+  .cv-when{font-family:var(--mono);font-size:12px;color:var(--accent);letter-spacing:.04em;padding-top:5px}
+  .cv-what h4{font-family:var(--serif);font-size:23px;font-weight:400;margin-bottom:2px}
+  .cv-what .cv-role{font-family:var(--mono);font-size:11px;color:var(--text-muted);letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px;display:block}
+  .cv-what p{font-size:14px;color:var(--text-dim);line-height:1.75;max-width:640px}
+  .cv-metrics{display:flex;gap:26px;flex-wrap:wrap;margin-top:14px}
+  .cv-metric{display:flex;flex-direction:column}
+  .cv-metric b{font-family:var(--serif);font-size:20px;font-style:italic;color:var(--text);font-weight:400}
+  .cv-metric span{font-family:var(--mono);font-size:10px;color:var(--text-muted);letter-spacing:.08em;text-transform:uppercase}
+  .cv-tail{
+    display:grid;grid-template-columns:130px 1fr;gap:28px;padding:26px 0;
+    border-top:1px solid var(--border);margin-top:8px;
+  }
+  .cv-tail p{font-size:14px;color:var(--text-dim);line-height:1.8}
+  .cv-tail p b{color:var(--text);font-weight:500}
+
+  /* CONTACT */
+  .contact{text-align:center;padding:54px 0 70px}
+  .contact-links{display:flex;justify-content:center;gap:36px;margin-top:36px;flex-wrap:wrap}
+  .contact-link{
+    font-family:var(--mono);font-size:14.5px;color:var(--text-dim);text-decoration:none;
+    display:flex;align-items:center;gap:10px;transition:color .2s;padding:10px 0;
+  }
+  .contact-link:hover{color:var(--accent)}
+  .contact-link svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.5}
+  .contact .section-title{font-size:clamp(26px,3.6vw,40px)}
+  .donate{text-align:center;padding:0 0 42px}
+  .ua-flag{display:inline-block;width:18px;height:12px;border-radius:2px;margin-right:10px;vertical-align:-1px;background:linear-gradient(#0057b7 0 50%,#ffd700 50% 100%)}
+  .donate-row{display:flex;justify-content:center;gap:18px;margin-top:26px;flex-wrap:wrap}
+  .donate-btn{
+    font-family:var(--mono);font-size:13px;letter-spacing:.02em;color:var(--text);
+    border:1px solid var(--border);border-radius:6px;padding:13px 22px;text-decoration:none;
+    transition:border-color .2s,color .2s;
+  }
+  .donate-btn:hover{border-color:#ffd700;color:#ffd700}
+  .donate-direct{max-width:640px;margin:26px auto 0;font-size:14.5px;line-height:1.7;color:var(--text-dim)}
+  .donate-direct a{color:var(--text);text-decoration:underline;text-underline-offset:3px}
+  .donate-direct a:hover{color:#ffd700}
+  .donate-ledger{font-family:var(--mono);font-size:13px;color:var(--accent)}
+  .donate-ledger a{color:inherit}
+  .donate-fifty{color:#ffd700;font-weight:500}
+
+  footer{padding:36px 0;border-top:1px solid var(--border);text-align:center}
+  footer p{font-family:var(--mono);font-size:11px;color:var(--text-muted);letter-spacing:.04em;line-height:1.9}
+  footer .served{color:var(--text-dim)}
+
+  @keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+  .reveal{opacity:0;transform:translateY(28px);transition:all .7s cubic-bezier(.23,1,.32,1)}
+  .reveal.visible{opacity:1;transform:translateY(0)}
+  @keyframes svgBreathe{0%,100%{opacity:.45}50%{opacity:1}}
+  .svg-breathe{animation:svgBreathe 3.8s ease-in-out infinite}
+  /* bake mode (?bake=1): the 4.3" panel's screenshot renderer - IntersectionObserver
+     never fires under headless virtual time, so force every reveal visible */
+  .baked *{animation:none!important;transition:none!important}
+  /* SMIL is not CSS animation: `animation:none` does not stop <animate>, so the
+     kobzar's full-page bake would freeze each diagram at whatever frame it happened
+     to catch. Hiding the elements pins every animated figure to its authored
+     resting state instead. */
+  .baked animate,.baked animateTransform,.baked animateMotion,.baked set{display:none}
+  .baked .reveal,.baked .hero-pre,.baked .hero h1,.baked .hero-sub,.baked .hero-meta{opacity:1!important;transform:none!important}
+  .baked .scroll-indicator{display:none}
+  .baked .hero{min-height:480px;padding-top:90px}   /* 100vh of a 6800px bake viewport is not a hero */
+
+  @media(max-width:768px){
+    .quote-strip blockquote{white-space:normal;font-size:21px;line-height:1.45}
+    .container{padding:0 20px}
+    section{padding:22px 0}
+    .hero-meta{gap:26px}
+    .nav-links{display:none}
+    .cv-row,.cv-tail{grid-template-columns:1fr;gap:10px}
+    .fleet-table th:nth-child(3),.fleet-table td:nth-child(3),
+    .fleet-table th:nth-child(4),.fleet-table td:nth-child(4){display:none}
+    .fleet-table th,.fleet-table td{padding-left:18px;padding-right:18px}
+    .contact-links{flex-direction:column;align-items:center;gap:14px}
+  }
+  @media(prefers-reduced-motion:reduce){
+    .rail-dot,.parade-dot animate{animation:none}
+    .parade-dot animate,.chron-scroll animateTransform,.chron-finger animate{display:none}
+    *{animation:none!important;transition:none!important}
+    .reveal{opacity:1;transform:none}
+  }
+</style>
+</head>
+<body>
+
+<div class="grid-bg"></div>
+<div class="noise"></div>
+
+<nav>
+  <div class="container">
+    <a class="nav-logo" href="#top" aria-label="Back to the top">KN<span>_</span></a>
+    <ul class="nav-links">
+      <li><a href="#fleet">Fleet</a></li>
+      <li><a href="#how">How it works</a></li>
+      <li><a href="#principles">Principles</a></li>
+      <li><a href="#cv">CV</a></li>
+      <li><a href="#contact">Contact</a></li>
+    </ul>
+  </div>
+</nav>
+
+<!-- ═══ HERO ═══ -->
+<section class="hero" id="top">
+  <div class="container">
+    <p class="hero-pre">Ivan Bohun · a self-hosted swarm</p>
+    <h1>This page is not<br>in the <em>cloud</em>.</h1>
+    <p class="hero-sub">
+      It is being served to you, right now, by four <strong>ESP32-S3 microcontroller
+      blades</strong>, sitting on a shelf in a London flat. They are watched over by two more
+      <strong>observer units</strong> that witness and visualize the swarm.
+    </p>
+    <p class="hero-sub">
+      The router forwards every request to one immortal virtual MAC address: <strong>the
+      mask</strong>, worn by whichever blade won the election. The wearer hands your connection to
+      the least busy blade, so you are answered by a different microcontroller from the one you
+      connected to.
+    </p>
+    <p class="hero-sub">
+      Every blade carries both programs, balancer and server, and the mask moves between them by
+      <strong>election</strong>, held over encrypted radio, off the wire.
+    </p>
+    <p class="hero-sub">
+      The page you are reading lives in flash memory, brotli-compressed, behind a TLS 1.3 handshake that
+      terminates on a 240 MHz microcontroller.
+    </p>
+    <p class="hero-sub"><strong>No AWS. No landlord. No rent.</strong></p>
+    <div class="hero-meta">
+      <div class="hero-meta-item">
+        <span class="hero-meta-label">Serving blades</span>
+        <span class="hero-meta-value live" id="m-nodes">4</span>
+      </div>
+      <div class="hero-meta-item">
+        <span class="hero-meta-label">Balancing now</span>
+        <span class="hero-meta-value" id="m-leader">otaman</span>
+      </div>
+      <div class="hero-meta-item">
+        <span class="hero-meta-label">Answering you</span>
+        <span class="hero-meta-value live" id="m-backends">·</span>
+      </div>
+      <div class="hero-meta-item">
+        <span class="hero-meta-label">Packet loss</span>
+        <span class="hero-meta-value" id="m-loss">0%</span>
+      </div>
+      <div class="hero-meta-item">
+        <span class="hero-meta-label">Total draw</span>
+        <span class="hero-meta-value">~22 W</span>
+      </div>
+      <div class="hero-meta-item">
+        <span class="hero-meta-label">Observer blades</span>
+        <span class="hero-meta-value" id="m-observers">2</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ LIVE FLEET ═══ -->
+<section id="fleet">
+  <div class="container">
+    <p class="section-label reveal">Live</p>
+    <h2 class="section-title reveal">The <em>fleet</em>, as you read this</h2>
+    <p class="section-intro reveal">
+      This table is not a screenshot. Your browser is polling <code>/roster</code> on the same
+      machine that sent you this page, every three seconds. The blades gossip over an encrypted
+      ESP-NOW radio mesh once a second, and each heartbeat carries the fleet's whole picture: who
+      is alive and serving, how strong every link is, what each blade has answered and how fast,
+      and what the balancer has relayed.
+    </p>
+
+    <div class="fleet reveal">
+      <div class="fleet-head">
+        <span class="fleet-title">swarm roster</span>
+        <span class="fleet-status" id="f-status"><span class="pulse" id="f-pulse"></span><span id="f-status-text">connecting</span></span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="fleet-table">
+          <thead>
+            <tr><th>Node</th><th>Role</th><th>Status</th><th>Link</th><th>Served</th><th>Temp</th><th>Uptime</th></tr>
+          </thead>
+          <tbody id="f-body">
+            <tr><td colspan="7" style="color:var(--text-muted)">reading the roster…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <!-- ROW 1: what the balancer did with the connections it was handed -->
+      <div class="fleet-foot">
+        <div class="fleet-stat">
+          <div class="fleet-stat-label">Quorum</div>
+          <div class="fleet-stat-value" id="f-quorum">·</div>
+        </div>
+        <div class="fleet-stat">
+          <div class="fleet-stat-label">Active backends</div>
+          <div class="fleet-stat-value" id="f-backends">·</div>
+        </div>
+        <div class="fleet-stat">
+          <div class="fleet-stat-label">Availability</div>
+          <div class="fleet-stat-value" id="f-avail">·</div>
+        </div>
+        <div class="fleet-stat">
+          <div class="fleet-stat-label">Connections received</div>
+          <div class="fleet-stat-value" id="f-req">·</div>
+        </div>
+        <div class="fleet-stat">
+          <div class="fleet-stat-label">Connections relayed</div>
+          <div class="fleet-stat-value" id="f-served">·</div>
+        </div>
+        <div class="fleet-stat">
+          <div class="fleet-stat-label">Connections refused</div>
+          <div class="fleet-stat-value" id="f-refused">·</div>
+        </div>
+        <div class="fleet-stat">
+          <div class="fleet-stat-label">Broken mid-transfer</div>
+          <div class="fleet-stat-value" id="f-killed">·</div>
+        </div>
+        <div class="fleet-stat">
+          <div class="fleet-stat-label">Closed after stalling</div>
+          <div class="fleet-stat-value" id="f-idle">·</div>
+        </div>
+      </div>
+      <!-- ROW 2: where the time inside a connection actually goes -->
+      <div class="fleet-foot fleet-foot-lat">
+        <div class="fleet-stat">
+          <div class="fleet-stat-label">p50 connect to backend</div>
+          <div class="fleet-stat-value" id="f-conn">·</div>
+        </div>
+        <div class="fleet-stat">
+          <div class="fleet-stat-label">p50 time to TLS first byte</div>
+          <div class="fleet-stat-value" id="f-ttfb">·</div>
+        </div>
+        <div class="fleet-stat">
+          <div class="fleet-stat-label">p50 response time</div>
+          <div class="fleet-stat-value" id="f-lat">·</div>
+        </div>
+        <div class="fleet-stat">
+          <div class="fleet-stat-label">p95 response time</div>
+          <div class="fleet-stat-value" id="f-p95">·</div>
+        </div>
+      </div>
+      <p class="fleet-note" id="f-note">
+        The names come from the Cossacks: the <b>otaman</b> is the
+        elected leader, wears the mask and hands every arriving connection to somebody else,
+        while each <b>kozak</b> does the actual work of answering it. Every serving blade
+        carries both programs, so which one it is doing depends only on who currently holds
+        the address. The <b>pysar</b> is the scribe that watches and keeps
+        the record, and the <b>kobzar</b> is named for the wandering bards who carried Cossack
+        history in song - here, the big screen that keeps the swarm's chronicle.
+        <br><br>
+        Since the fleet
+        started balancing, the elected node stops serving pages itself: it holds the mask,
+        takes every incoming connection, and splices it to a kozak that does the TLS work.
+        It works at layer 4, TCP, and never sees where one request ends and the next
+        begins, so it counts <b>connections</b> while the blades count <b>requests</b> -
+        those are different numbers, since your browser pulls this page, its
+        favicon, the og image and every roster poll down a single connection it keeps open.
+        The blades' figures in the table are requests; the otaman's is their sum.
+        <br><br>
+        <b>Connections received</b> is what arrived at the door since this node was elected,
+        <b>relayed</b> is what reached a clean finish, and <b>connections refused</b> is what
+        was turned away instantly because every backend was already busy.
+        <b>Broken mid-transfer</b> is a connection that died in flight, usually a reader
+        closing the tab; <b>closed after stalling</b> is one that went silent and was cleaned
+        up rather than left squatting a slot. In the second row, <b>connect to backend</b> is
+        how long the balancer waits to reach a kozak, and <b>time to TLS first byte</b> is how
+        long until that kozak sends its first TLS byte back. The <b>response times</b> come from
+        the blades instead - each kozak times every request it answers and reports its own
+        p50 and p95, and these are the average across the serving ones.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ HOW IT WORKS ═══ -->
+<!-- ═══ QUOTE ═══ -->
+<div class="quote-strip">
+  <div class="container">
+    <blockquote class="reveal">
+      Ivan Bohun broke his sabre rather than swear the oath,<br>
+      and legend says the shards return <em>when the land is free</em>.
+    </blockquote>
+    <p class="quote-attr reveal">Cossack colonel · kharakternyk</p>
+  </div>
+</div>
+
+<section id="how">
+  <div class="container">
+    <p class="section-label reveal">Architecture</p>
+    <h2 class="section-title reveal">Distributed system, <em>in miniature</em></h2>
+    <p class="section-intro reveal">
+      The trick that makes a swarm of disposable microcontrollers behave like one durable server
+      is that the identity is not attached to any of them. The blade holding the identity acts as
+      a Level 4 TCP splicer, relaying your connection to one of the downstream serving blades. The
+      fleet behaves like a single machine, but the work is spread across all of them.
+    </p>
+
+    <div class="diagram reveal">
+      <!-- shelf-iso:begin -->
+      <svg viewBox="0 40 800 540" role="img" aria-label="Isometric picture of the whole setup: four LILYGO ESP32-S3 blades on foam pads, the 2.8 inch Pysar TFT and its DevKitC driving a level shifter, the 4.3 inch Kobzar touchscreen, a six-pixel SK6812 rail with one pixel per member, the UGREEN power tower (six USB-C ports for the boards, two USB-A for the rack fans), and the switch where the world enters: a lime cable carries the request up to the masked leader and a green one carries it back down to the kozak that answers.">
+<g font-family="ui-monospace,SFMono-Regular,Menlo,monospace">
+<defs>
+<filter id="b2" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="1.8"/></filter>
+<filter id="b4" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="3.5"/></filter>
+<filter id="b8" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="7"/></filter>
+<radialGradient id="gPool"><stop offset="0" stop-color="#c4f04d" stop-opacity=".10"/><stop offset="1" stop-color="#c4f04d" stop-opacity="0"/></radialGradient>
+<linearGradient id="gScr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0d130c"/><stop offset="1" stop-color="#07070b"/></linearGradient>
+<marker id="mArr" markerWidth="8" markerHeight="8" refX="6.5" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#c4f04d"/></marker>
+<clipPath id="clipTop"><polygon points="300.0,130.0 750.3,390.0 490.5,540.0 40.2,280.0"/></clipPath>
+</defs>
+<ellipse cx="395" cy="335" rx="340" ry="140" fill="url(#gPool)"/>
+<polygon points="40.2,294.0 490.5,554.0 490.5,540.0 40.2,280.0" fill="#0b0b0f" stroke="#1f1f27" stroke-width="1.2"/>
+<polygon points="750.3,404.0 490.5,554.0 490.5,540.0 750.3,390.0" fill="#08080c" stroke="#1f1f27" stroke-width="1.2"/>
+<polygon points="300.0,130.0 750.3,390.0 490.5,540.0 40.2,280.0" fill="#101015" stroke="#1f1f27" stroke-width="1.2"/>
+<g clip-path="url(#clipTop)"><ellipse cx="395" cy="360" rx="270" ry="95" fill="url(#gPool)"/>
+<polyline points="334.6,150.0 74.8,300.0" fill="none" stroke="#15151b" stroke-width="1" opacity=".6"/>
+<polyline points="369.3,170.0 109.5,320.0" fill="none" stroke="#15151b" stroke-width="1" opacity=".6"/>
+<polyline points="403.9,190.0 144.1,340.0" fill="none" stroke="#15151b" stroke-width="1" opacity=".6"/>
+<polyline points="438.6,210.0 178.8,360.0" fill="none" stroke="#15151b" stroke-width="1" opacity=".6"/>
+<polyline points="473.2,230.0 213.4,380.0" fill="none" stroke="#15151b" stroke-width="1" opacity=".6"/>
+<polyline points="507.8,250.0 248.0,400.0" fill="none" stroke="#15151b" stroke-width="1" opacity=".6"/>
+<polyline points="542.5,270.0 282.7,420.0" fill="none" stroke="#15151b" stroke-width="1" opacity=".6"/>
+<polyline points="577.1,290.0 317.3,440.0" fill="none" stroke="#15151b" stroke-width="1" opacity=".6"/>
+<polyline points="611.8,310.0 352.0,460.0" fill="none" stroke="#15151b" stroke-width="1" opacity=".6"/>
+<polyline points="646.4,330.0 386.6,480.0" fill="none" stroke="#15151b" stroke-width="1" opacity=".6"/>
+<polyline points="681.1,350.0 421.2,500.0" fill="none" stroke="#15151b" stroke-width="1" opacity=".6"/>
+<polyline points="715.7,370.0 455.9,520.0" fill="none" stroke="#15151b" stroke-width="1" opacity=".6"/>
+<polyline points="274.0,145.0 724.4,405.0" fill="none" stroke="#15151b" stroke-width="1" opacity=".6"/>
+<polyline points="248.0,160.0 698.4,420.0" fill="none" stroke="#15151b" stroke-width="1" opacity=".6"/>
+<polyline points="222.1,175.0 672.4,435.0" fill="none" stroke="#15151b" stroke-width="1" opacity=".6"/>
+<polyline points="196.1,190.0 646.4,450.0" fill="none" stroke="#15151b" stroke-width="1" opacity=".6"/>
+<polyline points="170.1,205.0 620.4,465.0" fill="none" stroke="#15151b" stroke-width="1" opacity=".6"/>
+<polyline points="144.1,220.0 594.4,480.0" fill="none" stroke="#15151b" stroke-width="1" opacity=".6"/>
+<polyline points="118.1,235.0 568.5,495.0" fill="none" stroke="#15151b" stroke-width="1" opacity=".6"/>
+<polyline points="92.2,250.0 542.5,510.0" fill="none" stroke="#15151b" stroke-width="1" opacity=".6"/>
+<polyline points="66.2,265.0 516.5,525.0" fill="none" stroke="#15151b" stroke-width="1" opacity=".6"/></g>
+<ellipse cx="363" cy="264" rx="62" ry="17" fill="#000" opacity="0.38" filter="url(#b4)"/>
+<ellipse cx="169" cy="287" rx="42" ry="12" fill="#000" opacity="0.38" filter="url(#b4)"/>
+<ellipse cx="191" cy="304" rx="28" ry="9" fill="#000" opacity="0.3" filter="url(#b4)"/>
+<ellipse cx="246" cy="320" rx="54" ry="16" fill="#000" opacity="0.32" filter="url(#b4)"/>
+<ellipse cx="319" cy="362" rx="54" ry="16" fill="#000" opacity="0.32" filter="url(#b4)"/>
+<ellipse cx="391" cy="404" rx="54" ry="16" fill="#000" opacity="0.32" filter="url(#b4)"/>
+<ellipse cx="464" cy="446" rx="54" ry="16" fill="#000" opacity="0.32" filter="url(#b4)"/>
+<ellipse cx="538" cy="475" rx="88" ry="25" fill="#000" opacity="0.38" filter="url(#b4)"/>
+<ellipse cx="671" cy="393" rx="30" ry="10" fill="#000" opacity="0.34" filter="url(#b4)"/>
+<polygon points="632.6,388.0 662.0,405.0 662.0,345.0 632.6,328.0" fill="#101015" stroke="#262630" stroke-width="1.0"/>
+<polygon points="698.4,384.0 662.0,405.0 662.0,345.0 698.4,324.0" fill="#0d0d12" stroke="#262630" stroke-width="1.0"/>
+<polygon points="668.9,307.0 698.4,324.0 662.0,345.0 632.6,328.0" fill="#1a1a21" stroke="#262630" stroke-width="1.0"/>
+<g transform="matrix(0.8660,-0.5000,0,1,662.0,345.0)">
+<rect x="8" y="13" width="12" height="4" rx="2" fill="#05050a" stroke="#2a2a34" stroke-width=".6"/>
+<rect x="25" y="13" width="12" height="4" rx="2" fill="#05050a" stroke="#2a2a34" stroke-width=".6"/>
+<rect x="8" y="24" width="12" height="4" rx="2" fill="#05050a" stroke="#2a2a34" stroke-width=".6"/>
+<rect x="25" y="24" width="12" height="4" rx="2" fill="#05050a" stroke="#2a2a34" stroke-width=".6"/>
+<rect x="8" y="35" width="12" height="4" rx="2" fill="#05050a" stroke="#2a2a34" stroke-width=".6"/>
+<rect x="25" y="35" width="12" height="4" rx="2" fill="#05050a" stroke="#2a2a34" stroke-width=".6"/>
+<rect x="8" y="46" width="12" height="4" rx="2" fill="#05050a" stroke="#2a2a34" stroke-width=".6"/>
+<rect x="25" y="46" width="12" height="4" rx="2" fill="#05050a" stroke="#2a2a34" stroke-width=".6"/>
+<circle cx="34" cy="7" r="1.5" fill="#c4f04d" opacity=".9"/>
+</g>
+<g transform="matrix(0.8660,-0.5000,0.8660,0.5000,632.6,328.0)" font-family="ui-monospace,SFMono-Regular,Menlo,monospace"><text x="5.5" y="24" font-size="7" fill="#5a5a64" letter-spacing=".16em">UGREEN</text></g>
+<text x="677.5870760500153" y="304.0" font-size="9.5" fill="#7a7880" text-anchor="middle" letter-spacing=".14em" opacity="1">200 W · 6C + 2A</text>
+<text x="677.5870760500153" y="316.0" font-size="8.5" fill="#4a4850" text-anchor="middle" letter-spacing=".14em" opacity="1">one mains lead in</text>
+<path d="M688,366 C644,412 511,426 437,444" fill="none" stroke="#23232b" stroke-width="2.0" stroke-linecap="round" opacity=".92"/>
+<path d="M688,366 C644,412 438,384 364,402" fill="none" stroke="#23232b" stroke-width="1.9" stroke-linecap="round" opacity=".92"/>
+<path d="M688,366 C644,412 286,307 212,325" fill="none" stroke="#23232b" stroke-width="1.8" stroke-linecap="round" opacity=".92"/>
+<polygon points="294.8,279.0 317.3,292.0 317.3,284.0 294.8,271.0" fill="#0e0e12" stroke="#1e1e25" stroke-width="1.0"/>
+<polygon points="426.4,229.0 317.3,292.0 317.3,284.0 426.4,221.0" fill="#0c0c10" stroke="#1e1e25" stroke-width="1.0"/>
+<polygon points="403.9,208.0 426.4,221.0 317.3,284.0 294.8,271.0" fill="#14141a" stroke="#1e1e25" stroke-width="1.0"/>
+<g transform="matrix(0.8660,-0.5000,0,1,308.7,203.0)"><rect x="-6" y="-6" width="130" height="84" fill="#c4f04d" opacity=".14" filter="url(#b8)"/></g>
+<polygon points="301.7,271.0 308.7,275.0 308.7,203.0 301.7,199.0" fill="#0e0e13" stroke="#23232c" stroke-width="1.0"/>
+<polygon points="410.9,216.0 308.7,275.0 308.7,203.0 410.9,144.0" fill="#0b0b10" stroke="#23232c" stroke-width="1.0"/>
+<polygon points="403.9,140.0 410.9,144.0 308.7,203.0 301.7,199.0" fill="#15151c" stroke="#23232c" stroke-width="1.0"/>
+<g transform="matrix(0.8660,-0.5000,0,1,308.7,203.0)" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">
+<rect x="4" y="4" width="110" height="64" fill="url(#gScr)" stroke="#262631" stroke-width=".8"/>
+<rect x="8" y="8" width="102" height="8" fill="#0c120a"/>
+<text x="11" y="14.2" font-size="5.6" fill="#c4f04d" letter-spacing=".14em">IVAN BOHUN</text>
+<circle cx="105" cy="12" r="1.4" fill="#43e86a"/>
+<rect x="8" y="20" width="46" height="7.4" fill="#0f1013" stroke="#1c1c24" stroke-width=".5"/>
+<circle cx="12" cy="23.7" r="1.4" fill="#c4f04d"/>
+<rect x="16" y="22.6" width="15" height="2.4" fill="#3a3a44"/>
+<rect x="41" y="22.6" width="9.0" height="2.4" fill="#c4f04d" opacity=".75"/>
+<rect x="8" y="29" width="46" height="7.4" fill="#0f1013" stroke="#1c1c24" stroke-width=".5"/>
+<circle cx="12" cy="32.7" r="1.4" fill="#43e86a"/>
+<rect x="16" y="31.6" width="15" height="2.4" fill="#3a3a44"/>
+<rect x="41" y="31.6" width="7.5" height="2.4" fill="#c4f04d" opacity=".75"/>
+<rect x="8" y="38" width="46" height="7.4" fill="#0f1013" stroke="#1c1c24" stroke-width=".5"/>
+<circle cx="12" cy="41.7" r="1.4" fill="#43e86a"/>
+<rect x="16" y="40.6" width="15" height="2.4" fill="#3a3a44"/>
+<rect x="41" y="40.6" width="6.0" height="2.4" fill="#c4f04d" opacity=".75"/>
+<rect x="8" y="47" width="46" height="7.4" fill="#0f1013" stroke="#1c1c24" stroke-width=".5"/>
+<circle cx="12" cy="50.7" r="1.4" fill="#43e86a"/>
+<rect x="16" y="49.6" width="15" height="2.4" fill="#3a3a44"/>
+<rect x="41" y="49.6" width="4.5" height="2.4" fill="#c4f04d" opacity=".75"/>
+<rect x="60.0" y="36" width="4.6" height="10" fill="#c4f04d" opacity="0.50"/>
+<rect x="68.5" y="30" width="4.6" height="16" fill="#c4f04d" opacity="0.58"/>
+<rect x="77.0" y="38" width="4.6" height="8" fill="#c4f04d" opacity="0.66"/>
+<rect x="85.5" y="26" width="4.6" height="20" fill="#c4f04d" opacity="0.74"/>
+<rect x="94.0" y="33" width="4.6" height="13" fill="#c4f04d" opacity="0.82"/>
+<rect x="102.5" y="22" width="4.6" height="24" fill="#c4f04d" opacity="0.90"/>
+<polyline points="8,62 25,58 42,60 59,54 76,57 93,50 110,53" fill="none" stroke="#43e86a" stroke-width="1.3" opacity=".9"/>
+<rect x="4" y="4" width="110" height="12" fill="#fff" opacity=".03"/>
+</g>
+<text x="355.42562584220406" y="136.0" font-size="10" fill="#e8e6e3" text-anchor="middle" letter-spacing=".14em" opacity="1">4.3″ LCD touchscreen</text>
+<text x="355.42562584220406" y="148.0" font-size="8.5" fill="#7a7880" text-anchor="middle" letter-spacing=".14em" opacity="1">Kobzar · Waveshare ESP32-S3</text>
+<line x1="355" y1="153" x2="355" y2="170" stroke="#4a4850" stroke-width=".8"/>
+<polygon points="121.6,291.0 137.2,300.0 137.2,294.0 121.6,285.0" fill="#0e0e12" stroke="#1e1e25" stroke-width="1.0"/>
+<polygon points="199.5,264.0 137.2,300.0 137.2,294.0 199.5,258.0" fill="#0c0c10" stroke="#1e1e25" stroke-width="1.0"/>
+<polygon points="184.0,249.0 199.5,258.0 137.2,294.0 121.6,285.0" fill="#14141a" stroke="#1e1e25" stroke-width="1.0"/>
+<polygon points="149.3,305.0 175.3,320.0 175.3,317.0 149.3,302.0" fill="#101318" stroke="#20242c" stroke-width="1.0"/>
+<polygon points="224.7,291.5 175.3,320.0 175.3,317.0 224.7,288.5" fill="#0d1014" stroke="#20242c" stroke-width="1.0"/>
+<polygon points="198.7,273.5 224.7,288.5 175.3,317.0 149.3,302.0" fill="#161a21" stroke="#20242c" stroke-width="1.0"/>
+<polygon points="180.5,290.0 194.3,298.0 194.3,295.0 180.5,287.0" fill="#1d2129" stroke="#3a4150" stroke-width="1.0"/>
+<polygon points="209.9,289.0 194.3,298.0 194.3,295.0 209.9,286.0" fill="#171a20" stroke="#3a4150" stroke-width="1.0"/>
+<polygon points="196.1,278.0 209.9,286.0 194.3,295.0 180.5,287.0" fill="#2a2f39" stroke="#3a4150" stroke-width="1.0"/>
+<polygon points="154.5,300.0 161.4,304.0 161.4,301.5 154.5,297.5" fill="#191c22" stroke="#1e1e25" stroke-width="1.0"/>
+<polygon points="169.2,299.5 161.4,304.0 161.4,301.5 169.2,297.0" fill="#14171c" stroke="#1e1e25" stroke-width="1.0"/>
+<polygon points="162.3,293.0 169.2,297.0 161.4,301.5 154.5,297.5" fill="#262a31" stroke="#1e1e25" stroke-width="1.0"/>
+<path d="M194.3,277.0 C184.3,257.0 183.3,210.0 175.3,222.0" fill="none" stroke="#c65b54" stroke-width="1.1" opacity=".85"/>
+<path d="M189.1,280.0 C179.1,260.0 178.1,213.0 170.1,225.0" fill="none" stroke="#c98f4a" stroke-width="1.1" opacity=".85"/>
+<path d="M184.0,283.0 C174.0,263.0 172.9,216.0 164.9,228.0" fill="none" stroke="#c9c05a" stroke-width="1.1" opacity=".85"/>
+<path d="M178.8,286.0 C168.8,266.0 167.7,219.0 159.7,231.0" fill="none" stroke="#5abf74" stroke-width="1.1" opacity=".85"/>
+<path d="M173.6,289.0 C163.6,269.0 162.5,222.0 154.5,234.0" fill="none" stroke="#54a6c9" stroke-width="1.1" opacity=".85"/>
+<path d="M168.4,292.0 C158.4,272.0 157.3,225.0 149.3,237.0" fill="none" stroke="#8f6ec9" stroke-width="1.1" opacity=".85"/>
+<path d="M163.2,295.0 C153.2,275.0 152.1,228.0 144.1,240.0" fill="none" stroke="#c9c9cf" stroke-width="1.1" opacity=".85"/>
+<g transform="matrix(0.8660,-0.5000,0,1,133.7,238.0)"><rect x="-5" y="-5" width="74" height="60" fill="#c4f04d" opacity=".10" filter="url(#b8)"/></g>
+<polygon points="128.5,285.0 133.7,288.0 133.7,238.0 128.5,235.0" fill="#0e0e13" stroke="#23232c" stroke-width="1.0"/>
+<polygon points="189.1,256.0 133.7,288.0 133.7,238.0 189.1,206.0" fill="#0b0b10" stroke="#23232c" stroke-width="1.0"/>
+<polygon points="184.0,203.0 189.1,206.0 133.7,238.0 128.5,235.0" fill="#15151c" stroke="#23232c" stroke-width="1.0"/>
+<g transform="matrix(0.8660,-0.5000,0,1,133.7,238.0)" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">
+<rect x="3" y="3" width="58" height="44" fill="url(#gScr)" stroke="#262631" stroke-width=".7"/>
+<rect x="6" y="6" width="26" height="3.6" fill="#c4f04d" opacity=".9"/>
+<circle cx="8.4" cy="14.0" r="1.2" fill="#c4f04d"/>
+<rect x="12" y="12.9" width="10" height="2.2" fill="#3a3a44"/>
+<rect x="26" y="12.9" width="7" height="2.2" fill="#2c2c35"/>
+<rect x="36" y="12.9" width="4" height="2.2" fill="#c4f04d" opacity=".6"/>
+<circle cx="8.4" cy="20.4" r="1.2" fill="#43e86a"/>
+<rect x="12" y="19.299999999999997" width="10" height="2.2" fill="#3a3a44"/>
+<rect x="26" y="19.299999999999997" width="7" height="2.2" fill="#2c2c35"/>
+<rect x="36" y="19.299999999999997" width="4" height="2.2" fill="#c4f04d" opacity=".6"/>
+<circle cx="8.4" cy="26.8" r="1.2" fill="#43e86a"/>
+<rect x="12" y="25.7" width="10" height="2.2" fill="#3a3a44"/>
+<rect x="26" y="25.7" width="7" height="2.2" fill="#2c2c35"/>
+<rect x="36" y="25.7" width="4" height="2.2" fill="#c4f04d" opacity=".6"/>
+<circle cx="8.4" cy="33.2" r="1.2" fill="#43e86a"/>
+<rect x="12" y="32.1" width="10" height="2.2" fill="#3a3a44"/>
+<rect x="26" y="32.1" width="7" height="2.2" fill="#2c2c35"/>
+<rect x="36" y="32.1" width="4" height="2.2" fill="#c4f04d" opacity=".6"/>
+<circle cx="8.4" cy="39.6" r="1.2" fill="#4a4850"/>
+<rect x="12" y="38.5" width="10" height="2.2" fill="#3a3a44"/>
+<rect x="26" y="38.5" width="7" height="2.2" fill="#2c2c35"/>
+<rect x="36" y="38.5" width="4" height="2.2" fill="#c4f04d" opacity=".6"/>
+<rect x="3" y="3" width="58" height="8" fill="#fff" opacity=".03"/>
+</g>
+<text x="12" y="168" font-size="10" fill="#e8e6e3" text-anchor="start" letter-spacing=".14em" opacity="1">2.8″ TFT touch</text>
+<text x="12" y="180" font-size="8.5" fill="#7a7880" text-anchor="start" letter-spacing=".14em" opacity="1">Pysar · diymore ESP32-S3 DevKitC N16R8</text>
+<text x="12" y="191" font-size="8.5" fill="#4a4850" text-anchor="start" letter-spacing=".14em" opacity="1">drives the LED rail through the shifter</text>
+<line x1="118" y1="231" x2="129" y2="239" stroke="#4a4850" stroke-width=".8"/>
+<polygon points="182.2,321.0 230.7,349.0 230.7,344.0 182.2,316.0" fill="#0a0a0e" stroke="#16161c" stroke-width="1.0"/>
+<polygon points="306.9,305.0 230.7,349.0 230.7,344.0 306.9,300.0" fill="#08080b" stroke="#16161c" stroke-width="1.0"/>
+<polygon points="258.4,272.0 306.9,300.0 230.7,344.0 182.2,316.0" fill="#0d0d12" stroke="#16161c" stroke-width="1.0"/>
+<polygon points="190.9,316.0 230.7,339.0 230.7,335.0 190.9,312.0" fill="#0e1118" stroke="#1d222c" stroke-width="1.0"/>
+<polygon points="298.3,300.0 230.7,339.0 230.7,335.0 298.3,296.0" fill="#0b0d13" stroke="#1d222c" stroke-width="1.0"/>
+<polygon points="258.4,273.0 298.3,296.0 230.7,335.0 190.9,312.0" fill="#141821" stroke="#1d222c" stroke-width="1.0"/>
+<polygon points="235.9,294.0 256.7,306.0 256.7,302.0 235.9,290.0" fill="#1d2129" stroke="#3a4150" stroke-width="1.0"/>
+<polygon points="279.2,293.0 256.7,306.0 256.7,302.0 279.2,289.0" fill="#171a20" stroke="#3a4150" stroke-width="1.0"/>
+<polygon points="258.4,277.0 279.2,289.0 256.7,302.0 235.9,290.0" fill="#2a2f39" stroke="#3a4150" stroke-width="1.0"/>
+<polygon points="218.6,306.0 229.0,312.0 229.0,310.0 218.6,304.0" fill="#08090c" stroke="#1e1e25" stroke-width="1.0"/>
+<polygon points="239.4,306.0 229.0,312.0 229.0,310.0 239.4,304.0" fill="#07080a" stroke="#1e1e25" stroke-width="1.0"/>
+<polygon points="229.0,298.0 239.4,304.0 229.0,310.0 218.6,304.0" fill="#0b0d11" stroke="#1e1e25" stroke-width="1.0"/>
+<polygon points="244.6,312.0 257.6,319.5 257.6,307.5 244.6,300.0" fill="#161a20" stroke="#2c313b" stroke-width="1.0"/>
+<polygon points="272.3,311.0 257.6,319.5 257.6,307.5 272.3,299.0" fill="#12151b" stroke="#2c313b" stroke-width="1.0"/>
+<polygon points="259.3,291.5 272.3,299.0 257.6,307.5 244.6,300.0" fill="#20242c" stroke="#2c313b" stroke-width="1.0"/>
+<g transform="matrix(0.8660,-0.5000,0,1,257.6,307.5)"><rect x="3.5" y="3" width="10" height="7" fill="#05050a" stroke="#1a1e26" stroke-width=".6"/></g>
+<polygon points="199.5,313.0 208.2,318.0 208.2,315.0 199.5,310.0" fill="#191c22" stroke="#1e1e25" stroke-width="1.0"/>
+<polygon points="215.1,314.0 208.2,318.0 208.2,315.0 215.1,311.0" fill="#14171c" stroke="#1e1e25" stroke-width="1.0"/>
+<polygon points="206.5,306.0 215.1,311.0 208.2,315.0 199.5,310.0" fill="#262a31" stroke="#1e1e25" stroke-width="1.0"/>
+<circle cx="284.4" cy="298.0" r="3.4" fill="#c4f04d" opacity=".55" filter="url(#b2)" class="svg-breathe"/>
+<circle cx="284.4" cy="298.0" r="1.3" fill="#c4f04d"/>
+<g transform="matrix(0.8660,-0.5000,0.8660,0.5000,190.9,312.0)" font-family="ui-monospace,SFMono-Regular,Menlo,monospace"><text x="8" y="26" font-size="9" fill="#c4f04d" letter-spacing=".1em">N1</text></g>
+<polygon points="255.0,363.0 303.5,391.0 303.5,386.0 255.0,358.0" fill="#0a0a0e" stroke="#16161c" stroke-width="1.0"/>
+<polygon points="379.7,347.0 303.5,391.0 303.5,386.0 379.7,342.0" fill="#08080b" stroke="#16161c" stroke-width="1.0"/>
+<polygon points="331.2,314.0 379.7,342.0 303.5,386.0 255.0,358.0" fill="#0d0d12" stroke="#16161c" stroke-width="1.0"/>
+<polygon points="263.6,358.0 303.5,381.0 303.5,377.0 263.6,354.0" fill="#0e1118" stroke="#1d222c" stroke-width="1.0"/>
+<polygon points="371.0,342.0 303.5,381.0 303.5,377.0 371.0,338.0" fill="#0b0d13" stroke="#1d222c" stroke-width="1.0"/>
+<polygon points="331.2,315.0 371.0,338.0 303.5,377.0 263.6,354.0" fill="#141821" stroke="#1d222c" stroke-width="1.0"/>
+<polygon points="308.7,336.0 329.4,348.0 329.4,344.0 308.7,332.0" fill="#1d2129" stroke="#3a4150" stroke-width="1.0"/>
+<polygon points="352.0,335.0 329.4,348.0 329.4,344.0 352.0,331.0" fill="#171a20" stroke="#3a4150" stroke-width="1.0"/>
+<polygon points="331.2,319.0 352.0,331.0 329.4,344.0 308.7,332.0" fill="#2a2f39" stroke="#3a4150" stroke-width="1.0"/>
+<polygon points="291.3,348.0 301.7,354.0 301.7,352.0 291.3,346.0" fill="#08090c" stroke="#1e1e25" stroke-width="1.0"/>
+<polygon points="312.1,348.0 301.7,354.0 301.7,352.0 312.1,346.0" fill="#07080a" stroke="#1e1e25" stroke-width="1.0"/>
+<polygon points="301.7,340.0 312.1,346.0 301.7,352.0 291.3,346.0" fill="#0b0d11" stroke="#1e1e25" stroke-width="1.0"/>
+<polygon points="317.3,354.0 330.3,361.5 330.3,349.5 317.3,342.0" fill="#161a20" stroke="#2c313b" stroke-width="1.0"/>
+<polygon points="345.0,353.0 330.3,361.5 330.3,349.5 345.0,341.0" fill="#12151b" stroke="#2c313b" stroke-width="1.0"/>
+<polygon points="332.0,333.5 345.0,341.0 330.3,349.5 317.3,342.0" fill="#20242c" stroke="#2c313b" stroke-width="1.0"/>
+<g transform="matrix(0.8660,-0.5000,0,1,330.3,349.5)"><rect x="3.5" y="3" width="10" height="7" fill="#05050a" stroke="#1a1e26" stroke-width=".6"/></g>
+<polygon points="272.3,355.0 280.9,360.0 280.9,357.0 272.3,352.0" fill="#191c22" stroke="#1e1e25" stroke-width="1.0"/>
+<polygon points="287.9,356.0 280.9,360.0 280.9,357.0 287.9,353.0" fill="#14171c" stroke="#1e1e25" stroke-width="1.0"/>
+<polygon points="279.2,348.0 287.9,353.0 280.9,357.0 272.3,352.0" fill="#262a31" stroke="#1e1e25" stroke-width="1.0"/>
+<circle cx="357.2" cy="340.0" r="3.4" fill="#43e86a" opacity=".55" filter="url(#b2)"/>
+<circle cx="357.2" cy="340.0" r="1.3" fill="#43e86a"/>
+<g transform="matrix(0.8660,-0.5000,0.8660,0.5000,263.6,354.0)" font-family="ui-monospace,SFMono-Regular,Menlo,monospace"><text x="8" y="26" font-size="9" fill="#5a5a64" letter-spacing=".1em">N2</text></g>
+<polygon points="327.7,405.0 376.2,433.0 376.2,428.0 327.7,400.0" fill="#0a0a0e" stroke="#16161c" stroke-width="1.0"/>
+<polygon points="452.4,389.0 376.2,433.0 376.2,428.0 452.4,384.0" fill="#08080b" stroke="#16161c" stroke-width="1.0"/>
+<polygon points="403.9,356.0 452.4,384.0 376.2,428.0 327.7,400.0" fill="#0d0d12" stroke="#16161c" stroke-width="1.0"/>
+<polygon points="336.4,400.0 376.2,423.0 376.2,419.0 336.4,396.0" fill="#0e1118" stroke="#1d222c" stroke-width="1.0"/>
+<polygon points="443.8,384.0 376.2,423.0 376.2,419.0 443.8,380.0" fill="#0b0d13" stroke="#1d222c" stroke-width="1.0"/>
+<polygon points="403.9,357.0 443.8,380.0 376.2,419.0 336.4,396.0" fill="#141821" stroke="#1d222c" stroke-width="1.0"/>
+<polygon points="381.4,378.0 402.2,390.0 402.2,386.0 381.4,374.0" fill="#1d2129" stroke="#3a4150" stroke-width="1.0"/>
+<polygon points="424.7,377.0 402.2,390.0 402.2,386.0 424.7,373.0" fill="#171a20" stroke="#3a4150" stroke-width="1.0"/>
+<polygon points="403.9,361.0 424.7,373.0 402.2,386.0 381.4,374.0" fill="#2a2f39" stroke="#3a4150" stroke-width="1.0"/>
+<polygon points="364.1,390.0 374.5,396.0 374.5,394.0 364.1,388.0" fill="#08090c" stroke="#1e1e25" stroke-width="1.0"/>
+<polygon points="384.9,390.0 374.5,396.0 374.5,394.0 384.9,388.0" fill="#07080a" stroke="#1e1e25" stroke-width="1.0"/>
+<polygon points="374.5,382.0 384.9,388.0 374.5,394.0 364.1,388.0" fill="#0b0d11" stroke="#1e1e25" stroke-width="1.0"/>
+<polygon points="390.1,396.0 403.1,403.5 403.1,391.5 390.1,384.0" fill="#161a20" stroke="#2c313b" stroke-width="1.0"/>
+<polygon points="417.8,395.0 403.1,403.5 403.1,391.5 417.8,383.0" fill="#12151b" stroke="#2c313b" stroke-width="1.0"/>
+<polygon points="404.8,375.5 417.8,383.0 403.1,391.5 390.1,384.0" fill="#20242c" stroke="#2c313b" stroke-width="1.0"/>
+<g transform="matrix(0.8660,-0.5000,0,1,403.1,391.5)"><rect x="3.5" y="3" width="10" height="7" fill="#05050a" stroke="#1a1e26" stroke-width=".6"/></g>
+<polygon points="345.0,397.0 353.7,402.0 353.7,399.0 345.0,394.0" fill="#191c22" stroke="#1e1e25" stroke-width="1.0"/>
+<polygon points="360.6,398.0 353.7,402.0 353.7,399.0 360.6,395.0" fill="#14171c" stroke="#1e1e25" stroke-width="1.0"/>
+<polygon points="352.0,390.0 360.6,395.0 353.7,399.0 345.0,394.0" fill="#262a31" stroke="#1e1e25" stroke-width="1.0"/>
+<circle cx="429.9" cy="382.0" r="3.4" fill="#43e86a" opacity=".55" filter="url(#b2)"/>
+<circle cx="429.9" cy="382.0" r="1.3" fill="#43e86a"/>
+<g transform="matrix(0.8660,-0.5000,0.8660,0.5000,336.4,396.0)" font-family="ui-monospace,SFMono-Regular,Menlo,monospace"><text x="8" y="26" font-size="9" fill="#5a5a64" letter-spacing=".1em">N3</text></g>
+<polygon points="400.5,447.0 449.0,475.0 449.0,470.0 400.5,442.0" fill="#0a0a0e" stroke="#16161c" stroke-width="1.0"/>
+<polygon points="525.2,431.0 449.0,475.0 449.0,470.0 525.2,426.0" fill="#08080b" stroke="#16161c" stroke-width="1.0"/>
+<polygon points="476.7,398.0 525.2,426.0 449.0,470.0 400.5,442.0" fill="#0d0d12" stroke="#16161c" stroke-width="1.0"/>
+<polygon points="409.1,442.0 449.0,465.0 449.0,461.0 409.1,438.0" fill="#0e1118" stroke="#1d222c" stroke-width="1.0"/>
+<polygon points="516.5,426.0 449.0,465.0 449.0,461.0 516.5,422.0" fill="#0b0d13" stroke="#1d222c" stroke-width="1.0"/>
+<polygon points="476.7,399.0 516.5,422.0 449.0,461.0 409.1,438.0" fill="#141821" stroke="#1d222c" stroke-width="1.0"/>
+<polygon points="454.2,420.0 474.9,432.0 474.9,428.0 454.2,416.0" fill="#1d2129" stroke="#3a4150" stroke-width="1.0"/>
+<polygon points="497.5,419.0 474.9,432.0 474.9,428.0 497.5,415.0" fill="#171a20" stroke="#3a4150" stroke-width="1.0"/>
+<polygon points="476.7,403.0 497.5,415.0 474.9,428.0 454.2,416.0" fill="#2a2f39" stroke="#3a4150" stroke-width="1.0"/>
+<polygon points="436.8,432.0 447.2,438.0 447.2,436.0 436.8,430.0" fill="#08090c" stroke="#1e1e25" stroke-width="1.0"/>
+<polygon points="457.6,432.0 447.2,438.0 447.2,436.0 457.6,430.0" fill="#07080a" stroke="#1e1e25" stroke-width="1.0"/>
+<polygon points="447.2,424.0 457.6,430.0 447.2,436.0 436.8,430.0" fill="#0b0d11" stroke="#1e1e25" stroke-width="1.0"/>
+<polygon points="462.8,438.0 475.8,445.5 475.8,433.5 462.8,426.0" fill="#161a20" stroke="#2c313b" stroke-width="1.0"/>
+<polygon points="490.5,437.0 475.8,445.5 475.8,433.5 490.5,425.0" fill="#12151b" stroke="#2c313b" stroke-width="1.0"/>
+<polygon points="477.5,417.5 490.5,425.0 475.8,433.5 462.8,426.0" fill="#20242c" stroke="#2c313b" stroke-width="1.0"/>
+<g transform="matrix(0.8660,-0.5000,0,1,475.8,433.5)"><rect x="3.5" y="3" width="10" height="7" fill="#05050a" stroke="#1a1e26" stroke-width=".6"/></g>
+<polygon points="417.8,439.0 426.4,444.0 426.4,441.0 417.8,436.0" fill="#191c22" stroke="#1e1e25" stroke-width="1.0"/>
+<polygon points="433.4,440.0 426.4,444.0 426.4,441.0 433.4,437.0" fill="#14171c" stroke="#1e1e25" stroke-width="1.0"/>
+<polygon points="424.7,432.0 433.4,437.0 426.4,441.0 417.8,436.0" fill="#262a31" stroke="#1e1e25" stroke-width="1.0"/>
+<circle cx="502.6" cy="424.0" r="3.4" fill="#43e86a" opacity=".55" filter="url(#b2)"/>
+<circle cx="502.6" cy="424.0" r="1.3" fill="#43e86a"/>
+<g transform="matrix(0.8660,-0.5000,0.8660,0.5000,409.1,438.0)" font-family="ui-monospace,SFMono-Regular,Menlo,monospace"><text x="8" y="26" font-size="9" fill="#5a5a64" letter-spacing=".1em">N4</text></g>
+<ellipse cx="244.6" cy="268.0" rx="30" ry="10" fill="none" stroke="#c4f04d" stroke-width="3" opacity=".35" filter="url(#b2)" class="svg-breathe"/>
+<ellipse cx="244.6" cy="268.0" rx="30" ry="10" fill="none" stroke="#c4f04d" stroke-width="1.3" opacity=".9"/>
+<text x="244.57437415779592" y="248.0" font-size="9.5" fill="#c4f04d" text-anchor="middle" letter-spacing=".14em" opacity="1">wears the mask</text>
+<text x="478" y="243" font-size="9" fill="#7a7880" text-anchor="middle" letter-spacing=".14em" opacity="1">4× LILYGO T-ETH-Lite ESP32-S3</text>
+<text x="478" y="255" font-size="8.5" fill="#4a4850" text-anchor="middle" letter-spacing=".14em" opacity="1">Otaman + three Kozaky</text>
+<line x1="452" y1="262" x2="404" y2="292" stroke="#4a4850" stroke-width=".8" opacity=".8"/>
+<path d="M317,346 Q281,280 245,304" fill="none" stroke="#42424e" stroke-width="1.1" stroke-dasharray="3 5" opacity=".7"/>
+<path d="M390,388 Q317,286 245,304" fill="none" stroke="#42424e" stroke-width="1.1" stroke-dasharray="3 5" opacity=".7"/>
+<path d="M463,430 Q354,292 245,304" fill="none" stroke="#42424e" stroke-width="1.1" stroke-dasharray="3 5" opacity=".7"/>
+<path d="M187,294 Q216,271 245,304" fill="none" stroke="#42424e" stroke-width="1.1" stroke-dasharray="3 5" opacity=".7"/>
+<text x="512" y="330" font-size="9.5" fill="#4a4850" text-anchor="middle" letter-spacing=".14em" opacity="1">esp-now · 1 Hz</text>
+<line x1="478" y1="337" x2="416" y2="367" stroke="#4a4850" stroke-width=".8" opacity=".8"/>
+<polygon points="438.6,490.0 499.2,525.0 499.2,499.0 438.6,464.0" fill="#101016" stroke="#232330" stroke-width="1.0"/>
+<polygon points="629.1,450.0 499.2,525.0 499.2,499.0 629.1,424.0" fill="#0d0d12" stroke="#232330" stroke-width="1.0"/>
+<polygon points="568.5,389.0 629.1,424.0 499.2,499.0 438.6,464.0" fill="#181820" stroke="#232330" stroke-width="1.0"/>
+<g transform="matrix(0.8660,-0.5000,0.8660,0.5000,438.6,464.0)">
+<line x1="14" y1="14" x2="14" y2="56" stroke="#0b0b0f" stroke-width="3" opacity=".9"/>
+<line x1="26" y1="14" x2="26" y2="56" stroke="#0b0b0f" stroke-width="3" opacity=".9"/>
+<line x1="38" y1="14" x2="38" y2="56" stroke="#0b0b0f" stroke-width="3" opacity=".9"/>
+<line x1="50" y1="14" x2="50" y2="56" stroke="#0b0b0f" stroke-width="3" opacity=".9"/>
+<line x1="62" y1="14" x2="62" y2="56" stroke="#0b0b0f" stroke-width="3" opacity=".9"/>
+<line x1="74" y1="14" x2="74" y2="56" stroke="#0b0b0f" stroke-width="3" opacity=".9"/>
+<line x1="86" y1="14" x2="86" y2="56" stroke="#0b0b0f" stroke-width="3" opacity=".9"/>
+<line x1="98" y1="14" x2="98" y2="56" stroke="#0b0b0f" stroke-width="3" opacity=".9"/>
+<line x1="110" y1="14" x2="110" y2="56" stroke="#0b0b0f" stroke-width="3" opacity=".9"/>
+<line x1="122" y1="14" x2="122" y2="56" stroke="#0b0b0f" stroke-width="3" opacity=".9"/>
+<line x1="134" y1="14" x2="134" y2="56" stroke="#0b0b0f" stroke-width="3" opacity=".9"/>
+<text x="56" y="66" font-size="8" fill="#565660" letter-spacing=".18em" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">TENDA SG108</text></g>
+<g transform="matrix(0.8660,-0.5000,0,1,499.2,499.0)">
+<rect x="12" y="9" width="11" height="10" fill="#06060a" stroke="#1c1c24" stroke-width=".6"/>
+<rect x="29" y="9" width="11" height="10" fill="#06060a" stroke="#1c1c24" stroke-width=".6"/>
+<circle cx="31.5" cy="6" r="1.1" fill="#c4f04d"/>
+<rect x="46" y="9" width="11" height="10" fill="#06060a" stroke="#1c1c24" stroke-width=".6"/>
+<circle cx="48.5" cy="6" r="1.1" fill="#c4f04d"/>
+<rect x="63" y="9" width="11" height="10" fill="#06060a" stroke="#1c1c24" stroke-width=".6"/>
+<circle cx="65.5" cy="6" r="1.1" fill="#c4f04d"/>
+<rect x="80" y="9" width="11" height="10" fill="#06060a" stroke="#1c1c24" stroke-width=".6"/>
+<circle cx="82.5" cy="6" r="1.1" fill="#c4f04d"/>
+<rect x="97" y="9" width="11" height="10" fill="#06060a" stroke="#1c1c24" stroke-width=".6"/>
+<rect x="114" y="9" width="11" height="10" fill="#06060a" stroke="#1c1c24" stroke-width=".6"/>
+<rect x="131" y="9" width="11" height="10" fill="#06060a" stroke="#1c1c24" stroke-width=".6"/>
+<circle cx="133.5" cy="6" r="1.1" fill="#c4f04d"/>
+</g>
+<path d="M266,312 C285,408 552,512 530,495" fill="none" stroke="#c4f04d" stroke-width="5.5" opacity=".22" filter="url(#b2)" class="svg-breathe"/>
+<path d="M266,312 C285,408 552,512 530,495" fill="none" stroke="#c4f04d" stroke-width="2.6" stroke-linecap="round"/>
+<path d="M339,354 C358,432 568,505 545,487" fill="none" stroke="#26262e" stroke-width="2.6" stroke-linecap="round"/>
+<path d="M411,396 C426,452 580,498 559,478" fill="none" stroke="#43e86a" stroke-width="5.5" opacity=".16" filter="url(#b2)" class="svg-breathe"/>
+<path d="M411,396 C426,452 580,498 559,478" fill="none" stroke="#43e86a" stroke-width="2.6" stroke-linecap="round" opacity=".9"/>
+<path d="M484,438 C494,466 588,486 574,470" fill="none" stroke="#26262e" stroke-width="2.6" stroke-linecap="round"/>
+<path d="M745,505 C710,485 660,462 618,444" fill="none" stroke="#c4f04d" stroke-width="2" opacity=".85" marker-end="url(#mArr)"/>
+<text x="712" y="525" font-size="9.5" fill="#a7c94e" text-anchor="middle" letter-spacing=".14em" opacity="1">the world</text>
+<polygon points="142.4,317.0 171.8,334.0 171.8,331.0 142.4,314.0" fill="#101828" stroke="#22345c" stroke-width="1.0"/>
+<polygon points="184.0,327.0 171.8,334.0 171.8,331.0 184.0,324.0" fill="#0c1220" stroke="#22345c" stroke-width="1.0"/>
+<polygon points="154.5,307.0 184.0,324.0 171.8,331.0 142.4,314.0" fill="#16213a" stroke="#22345c" stroke-width="1.0"/>
+<polygon points="152.8,316.0 164.9,323.0 164.9,320.5 152.8,313.5" fill="#12151b" stroke="#2c313b" stroke-width="1.0"/>
+<polygon points="171.0,319.5 164.9,323.0 164.9,320.5 171.0,317.0" fill="#0f1116" stroke="#2c313b" stroke-width="1.0"/>
+<polygon points="158.8,310.0 171.0,317.0 164.9,320.5 152.8,313.5" fill="#1b1e26" stroke="#2c313b" stroke-width="1.0"/>
+<text x="173.56029104747194" y="303.0" font-size="8" fill="#7a7880" text-anchor="end" letter-spacing=".14em" opacity="1">74AHCT125 · 3.3→5 V</text>
+<path d="M174,303 Q176,315 165,315" fill="none" stroke="#43e86a" stroke-width="1.5" opacity=".75"/>
+<path d="M165,315 Q171,327 165,331" fill="none" stroke="#43e86a" stroke-width="1.5" opacity=".75"/>
+<polygon points="151.0,336.0 410.9,486.0 410.9,482.5 151.0,332.5" fill="#0d0d11" stroke="#1c1c22" stroke-width="1.0"/>
+<polygon points="419.5,481.0 410.9,486.0 410.9,482.5 419.5,477.5" fill="#0a0a0e" stroke="#1c1c22" stroke-width="1.0"/>
+<polygon points="159.7,327.5 419.5,477.5 410.9,482.5 151.0,332.5" fill="#131318" stroke="#1c1c22" stroke-width="1.0"/>
+<ellipse cx="177" cy="349" rx="24" ry="8" fill="#c4f04d" opacity="0.12" filter="url(#b4)"/>
+<circle cx="171.8" cy="338.0" r="4.5" fill="#c4f04d" opacity="0.95" filter="url(#b2)" class="svg-breathe"/>
+<g transform="matrix(0.8660,-0.5000,0.8660,0.5000,164.9,340.5)"><rect x="2" y="0" width="6" height="5" fill="#c4f04d" opacity=".95"/></g>
+<ellipse cx="219" cy="374" rx="24" ry="8" fill="#e8e6e3" opacity="0.06" filter="url(#b4)"/>
+<circle cx="214.3" cy="362.5" r="4.5" fill="#e8e6e3" opacity="0.55" filter="url(#b2)"/>
+<g transform="matrix(0.8660,-0.5000,0.8660,0.5000,207.3,365.0)"><rect x="2" y="0" width="6" height="5" fill="#e8e6e3" opacity=".95"/></g>
+<ellipse cx="262" cy="398" rx="24" ry="8" fill="#e8e6e3" opacity="0.06" filter="url(#b4)"/>
+<circle cx="256.7" cy="387.0" r="4.5" fill="#e8e6e3" opacity="0.55" filter="url(#b2)"/>
+<g transform="matrix(0.8660,-0.5000,0.8660,0.5000,249.8,389.5)"><rect x="2" y="0" width="6" height="5" fill="#e8e6e3" opacity=".95"/></g>
+<ellipse cx="304" cy="422" rx="24" ry="8" fill="#e8e6e3" opacity="0.06" filter="url(#b4)"/>
+<circle cx="299.1" cy="411.5" r="4.5" fill="#e8e6e3" opacity="0.55" filter="url(#b2)"/>
+<g transform="matrix(0.8660,-0.5000,0.8660,0.5000,292.2,414.0)"><rect x="2" y="0" width="6" height="5" fill="#e8e6e3" opacity=".95"/></g>
+<ellipse cx="347" cy="447" rx="24" ry="8" fill="#3d5ce0" opacity="0.1" filter="url(#b4)"/>
+<circle cx="341.6" cy="436.0" r="4.5" fill="#3d5ce0" opacity="0.8" filter="url(#b2)"/>
+<g transform="matrix(0.8660,-0.5000,0.8660,0.5000,334.6,438.5)"><rect x="2" y="0" width="6" height="5" fill="#3d5ce0" opacity=".95"/></g>
+<ellipse cx="389" cy="472" rx="24" ry="8" fill="#8d4de0" opacity="0.1" filter="url(#b4)"/>
+<circle cx="384.0" cy="460.5" r="4.5" fill="#8d4de0" opacity="0.8" filter="url(#b2)"/>
+<g transform="matrix(0.8660,-0.5000,0.8660,0.5000,377.1,463.0)"><rect x="2" y="0" width="6" height="5" fill="#8d4de0" opacity=".95"/></g>
+<text x="212" y="476" font-size="9.5" fill="#4a4850" text-anchor="middle" letter-spacing=".14em" opacity="1">sk6812 rgbw · six pixels, one per member</text>
+<text x="212" y="489" font-size="8.5" fill="#4a4850" text-anchor="middle" letter-spacing=".14em" opacity="0.75">N1 · N2 · N3 · N4 · Display · Mission Control</text>
+</g>
+</svg>
+      <!-- shelf-iso:end -->
+      <p class="diagram-cap">
+        <b>The machine itself.</b> Four serving blades on their pads, each with its own jack into
+        the six-port fabric. The small screen is the pysar keeping the roster; the 4.3 inch
+        touch panel is the kobzar keeping the chronicle. Along the front edge runs an SK6812 rail
+        with one pixel per member: lime for the otaman, white for the kozaky, blue for the pysar,
+        purple for mission control. Your request enters at the switch, <span style="color:var(--accent)">rides the lime cable
+        up to the mask holder</span>, and is <span style="color:var(--alive)">spliced back down the
+        green one to the kozak</span> that answers it.
+      </p>
+    </div>
+
+    <div class="diagram reveal">
+      <svg viewBox="0 0 720 360" role="img" aria-label="Diagram: a visitor reaches one static address, which the elected leader currently wears; if it dies the next node claims the same address.">
+        <defs>
+          <marker id="ah" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
+            <path d="M0,0 L9,4.5 L0,9 z" fill="#c4f04d"/>
+          </marker>
+          <marker id="ahd" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto">
+            <path d="M0,0 L9,4.5 L0,9 z" fill="#4a4850"/>
+          </marker>
+        </defs>
+        <g font-family="ui-monospace,SFMono-Regular,Menlo,monospace">
+          <!-- visitor -->
+          <rect x="4" y="112" width="104" height="52" rx="3" fill="#16161c" stroke="#2a2a33"/>
+          <text x="56" y="134" fill="#e8e6e3" font-size="12" text-anchor="middle">you</text>
+          <text x="56" y="150" fill="#4a4850" font-size="9" text-anchor="middle">a browser</text>
+
+          <!-- the mask / static address -->
+          <line x1="108" y1="138" x2="176" y2="138" stroke="#c4f04d" stroke-width="1.5" marker-end="url(#ah)"/>
+          <rect x="180" y="104" width="150" height="68" rx="3" fill="#111115" stroke="#c4f04d" stroke-width="1.5"/>
+          <text x="255" y="132" fill="#c4f04d" font-size="12" text-anchor="middle">the mask</text>
+          <text x="255" y="152" fill="#7a7880" font-size="9" text-anchor="middle">one static address</text>
+
+          <!-- switch fanout -->
+          <line x1="330" y1="138" x2="392" y2="138" stroke="#c4f04d" stroke-width="1.5" marker-end="url(#ah)"/>
+
+          <!-- blades -->
+          <rect x="400" y="18" width="150" height="46" rx="3" fill="#16161c" stroke="#c4f04d" stroke-width="1.5"/>
+          <circle cx="418" cy="41" r="4" fill="#c4f04d"/>
+          <text x="434" y="38" fill="#e8e6e3" font-size="11">n1</text>
+          <text x="434" y="52" fill="#c4f04d" font-size="9">otaman · wears it</text>
+
+          <rect x="400" y="76" width="150" height="46" rx="3" fill="#16161c" stroke="#2a2a33"/>
+          <circle cx="418" cy="99" r="4" fill="#43e86a"/>
+          <text x="434" y="96" fill="#e8e6e3" font-size="11">n2</text>
+          <text x="434" y="110" fill="#4a4850" font-size="9">kozak · ready</text>
+
+          <rect x="400" y="134" width="150" height="46" rx="3" fill="#16161c" stroke="#2a2a33"/>
+          <circle cx="418" cy="157" r="4" fill="#43e86a"/>
+          <text x="434" y="154" fill="#e8e6e3" font-size="11">n3</text>
+          <text x="434" y="168" fill="#4a4850" font-size="9">kozak · ready</text>
+
+          <rect x="400" y="192" width="150" height="46" rx="3" fill="#16161c" stroke="#2a2a33"/>
+          <circle cx="418" cy="215" r="4" fill="#43e86a"/>
+          <text x="434" y="212" fill="#e8e6e3" font-size="11">n4</text>
+          <text x="434" y="226" fill="#4a4850" font-size="9">kozak · ready</text>
+
+          <rect x="400" y="250" width="150" height="46" rx="3" fill="#0e0e12" stroke="#1e1e25" stroke-dasharray="3 3"/>
+          <circle cx="418" cy="273" r="4" fill="#4a4850"/>
+          <text x="434" y="270" fill="#7a7880" font-size="11">display</text>
+          <text x="434" y="284" fill="#4a4850" font-size="9">pysar · only watches</text>
+
+          <rect x="400" y="308" width="150" height="46" rx="3" fill="#0e0e12" stroke="#1e1e25" stroke-dasharray="3 3"/>
+          <circle cx="418" cy="331" r="4" fill="#4a4850"/>
+          <text x="434" y="328" fill="#7a7880" font-size="11">mission control</text>
+          <text x="434" y="342" fill="#4a4850" font-size="9">kobzar · only watches</text>
+
+          <!-- radio mesh -->
+          <path d="M562 41 C 610 41, 610 215, 562 215" fill="none" stroke="#2a2a33" stroke-width="1" stroke-dasharray="2 4"/>
+          <path d="M562 99 C 596 99, 596 273, 562 273" fill="none" stroke="#2a2a33" stroke-width="1" stroke-dasharray="2 4"/>
+          <path d="M562 157 C 582 157, 582 331, 562 331" fill="none" stroke="#2a2a33" stroke-width="1" stroke-dasharray="2 4"/>
+          <text x="624" y="150" fill="#4a4850" font-size="9" text-anchor="middle">ESP-NOW</text>
+          <text x="624" y="163" fill="#4a4850" font-size="9" text-anchor="middle">heartbeats</text>
+          <text x="624" y="176" fill="#4a4850" font-size="9" text-anchor="middle">1 Hz</text>
+
+          <!-- failover hint -->
+          <line x1="392" y1="52" x2="392" y2="96" stroke="#4a4850" stroke-width="1.2" stroke-dasharray="3 3" marker-end="url(#ahd)"/>
+          <text x="386" y="78" fill="#4a4850" font-size="9" text-anchor="end">on death,</text>
+          <text x="386" y="90" fill="#4a4850" font-size="9" text-anchor="end">mask moves</text>
+        </g>
+      </svg>
+      <p class="diagram-cap">
+        <b>The mask.</b> The address you connect to is a locally administered MAC that no factory
+        ever issued. The elected leader writes it into its own Ethernet controller and claims the
+        static IP. Lose that node and the next one in line writes the same address into itself,
+        sends a gratuitous ARP so the switch relearns the port, and carries on answering. The
+        visitor never learns that anything died.
+      </p>
+    </div>
+
+    <div class="diagram reveal">
+      <svg viewBox="0 0 720 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Request path through the balanced fleet. A browser opens one TCP connection on port 443 to the mask, a single static address and virtual MAC held by whichever blade is currently the elected otaman. The otaman is a layer 4 TCP splicer: it relays raw bytes, never decrypts and never parses HTTP, chooses a backend by least connections with round-robin on ties. Three kozak blades each terminate TLS themselves on a LAN-only port and serve the page from flash, so the single TLS session runs from the browser all the way to the kozak. A strip along the bottom shows all four blades gossiping over encrypted ESP-NOW radio at one hertz, building the roster of blades that are alive, serving and holding an address, from which the splicer rebuilds its backend set every second.">
+        <defs>
+          <marker id="balArrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto" markerUnits="strokeWidth">
+            <path d="M0 0 L7 3.5 L0 7 Z" fill="#c4f04d"/>
+          </marker>
+        </defs>
+        <g font-family="ui-monospace,SFMono-Regular,Menlo,monospace">
+
+          <!-- the single tls session, drawn over the top -->
+          <text x="150" y="15" text-anchor="middle" font-size="10" fill="#e8e6e3">one tls session, browser to kozak</text>
+          <path d="M55 100 L55 24 L508 24 L508 40" fill="none" stroke="#c4f04d" stroke-width="1" stroke-dasharray="4 4" marker-end="url(#balArrow)"/>
+          <circle cx="321" cy="24" r="4" fill="#0e0e12" stroke="#c4f04d" stroke-width="1"/>
+          <path d="M321 29 L321 42" stroke="#4a4850" stroke-width="1" stroke-dasharray="2 4"/>
+
+          <!-- you, a browser -->
+          <rect x="12" y="100" width="86" height="74" rx="3" fill="#16161c" stroke="#2a2a33" stroke-width="1"/>
+          <path d="M12 117 L98 117" stroke="#2a2a33" stroke-width="1"/>
+          <circle cx="24" cy="109" r="2" fill="#4a4850"/>
+          <circle cx="32" cy="109" r="2" fill="#4a4850"/>
+          <circle cx="40" cy="109" r="2" fill="#4a4850"/>
+          <text x="55" y="141" text-anchor="middle" font-size="12" fill="#e8e6e3">you</text>
+          <text x="55" y="157" text-anchor="middle" font-size="9" fill="#7a7880">a browser</text>
+          <text x="55" y="169" text-anchor="middle" font-size="9" fill="#4a4850">tls client</text>
+
+          <!-- browser to the mask -->
+          <text x="110" y="127" text-anchor="middle" font-size="9" fill="#7a7880">tcp</text>
+          <path d="M98 137 L120 137" stroke="#c4f04d" stroke-width="1.5" marker-end="url(#balArrow)"/>
+          <text x="110" y="153" text-anchor="middle" font-size="9" fill="#7a7880">:443</text>
+
+          <!-- the mask -->
+          <rect x="122" y="92" width="92" height="90" rx="3" fill="#16161c" stroke="#c4f04d" stroke-width="1"/>
+          <text x="168" y="112" text-anchor="middle" font-size="11" fill="#c4f04d">the mask</text>
+          <text x="168" y="128" text-anchor="middle" font-size="9" fill="#7a7880">one static ip</text>
+          <text x="168" y="140" text-anchor="middle" font-size="9" fill="#7a7880">one vmac</text>
+          <path d="M132 149 L204 149" stroke="#1e1e25" stroke-width="1"/>
+          <text x="168" y="163" text-anchor="middle" font-size="9" fill="#e8e6e3">the router</text>
+          <text x="168" y="175" text-anchor="middle" font-size="9" fill="#e8e6e3">forwards 80/443</text>
+          <text x="168" y="198" text-anchor="middle" font-size="9" fill="#7a7880">worn by the otaman</text>
+
+          <!-- the mask to the otaman -->
+          <path d="M214 137 L234 137" stroke="#c4f04d" stroke-width="1.5" marker-end="url(#balArrow)"/>
+
+          <!-- the otaman: l4 splicer -->
+          <rect x="236" y="44" width="170" height="200" rx="3" fill="#16161c" stroke="#c4f04d" stroke-width="1.5"/>
+          <text x="321" y="64" text-anchor="middle" font-size="12" fill="#c4f04d">the otaman</text>
+          <text x="321" y="79" text-anchor="middle" font-size="10" fill="#7a7880">layer-4 tcp splicer</text>
+          <path d="M248 88 L394 88" stroke="#1e1e25" stroke-width="1"/>
+          <rect x="246" y="94" width="150" height="52" rx="3" fill="#111115" stroke="#2a2a33" stroke-width="1"/>
+          <text x="321" y="111" text-anchor="middle" font-size="10" fill="#e8e6e3">never decrypts</text>
+          <text x="321" y="125" text-anchor="middle" font-size="10" fill="#e8e6e3">never parses http</text>
+          <text x="321" y="139" text-anchor="middle" font-size="9" fill="#7a7880">raw bytes only</text>
+          <rect x="246" y="154" width="150" height="82" rx="3" fill="#111115" stroke="#2a2a33" stroke-width="1"/>
+          <text x="321" y="170" text-anchor="middle" font-size="10" fill="#e8e6e3">least-connections</text>
+          <text x="321" y="182" text-anchor="middle" font-size="9" fill="#7a7880">round-robin on ties</text>
+          <text x="321" y="198" text-anchor="middle" font-size="9" fill="#e8e6e3">4 in flight per backend</text>
+          <text x="321" y="210" text-anchor="middle" font-size="9" fill="#7a7880">12 relay slots total</text>
+          <text x="321" y="226" text-anchor="middle" font-size="9" fill="#7a7880">past that, it waits</text>
+
+          <!-- splice out to the kozaky -->
+          <path d="M406 137 C 428 137, 428 71, 444 71" fill="none" stroke="#c4f04d" stroke-width="1.5" marker-end="url(#balArrow)"/>
+          <path d="M406 137 L444 137" fill="none" stroke="#c4f04d" stroke-width="1.5" marker-end="url(#balArrow)"/>
+          <path d="M406 137 C 428 137, 428 203, 444 203" fill="none" stroke="#c4f04d" stroke-width="1.5" marker-end="url(#balArrow)"/>
+
+          <!-- kozak 1 -->
+          <rect x="448" y="44" width="120" height="54" rx="3" fill="#16161c" stroke="#43e86a" stroke-width="1"/>
+          <circle cx="464" cy="60" r="4" fill="#43e86a"/>
+          <text x="476" y="64" font-size="11" fill="#e8e6e3">kozak 1</text>
+          <path d="M458 70 L558 70" stroke="#1e1e25" stroke-width="1"/>
+          <text x="458" y="86" font-size="9" fill="#43e86a">tls handshake here</text>
+
+          <!-- kozak 2 -->
+          <rect x="448" y="110" width="120" height="54" rx="3" fill="#16161c" stroke="#43e86a" stroke-width="1"/>
+          <circle cx="464" cy="126" r="4" fill="#43e86a"/>
+          <text x="476" y="130" font-size="11" fill="#e8e6e3">kozak 2</text>
+          <path d="M458 136 L558 136" stroke="#1e1e25" stroke-width="1"/>
+          <text x="458" y="152" font-size="9" fill="#43e86a">tls handshake here</text>
+
+          <!-- kozak 3 -->
+          <rect x="448" y="176" width="120" height="54" rx="3" fill="#16161c" stroke="#43e86a" stroke-width="1"/>
+          <circle cx="464" cy="192" r="4" fill="#43e86a"/>
+          <text x="476" y="196" font-size="11" fill="#e8e6e3">kozak 3</text>
+          <path d="M458 202 L558 202" stroke="#1e1e25" stroke-width="1"/>
+          <text x="458" y="218" font-size="9" fill="#43e86a">tls handshake here</text>
+
+          <!-- the page, in flash -->
+          <path d="M568 71 L606 71" stroke="#c4f04d" stroke-width="1.5" marker-end="url(#balArrow)"/>
+          <path d="M568 137 L606 137" stroke="#c4f04d" stroke-width="1.5" marker-end="url(#balArrow)"/>
+          <path d="M568 203 L606 203" stroke="#c4f04d" stroke-width="1.5" marker-end="url(#balArrow)"/>
+          <rect x="608" y="58" width="100" height="26" rx="3" fill="#111115" stroke="#2a2a33" stroke-width="1"/>
+          <text x="658" y="74" text-anchor="middle" font-size="9" fill="#7a7880">page in flash</text>
+          <rect x="608" y="124" width="100" height="26" rx="3" fill="#111115" stroke="#2a2a33" stroke-width="1"/>
+          <text x="658" y="140" text-anchor="middle" font-size="9" fill="#7a7880">page in flash</text>
+          <rect x="608" y="190" width="100" height="26" rx="3" fill="#111115" stroke="#2a2a33" stroke-width="1"/>
+          <text x="658" y="206" text-anchor="middle" font-size="9" fill="#7a7880">page in flash</text>
+
+          <!-- what the roster feeds the splicer -->
+          <text x="314" y="268" text-anchor="end" font-size="9" fill="#c4f04d">usable backends</text>
+          <path d="M321 292 L321 250" fill="none" stroke="#c4f04d" stroke-width="1" stroke-dasharray="4 4" marker-end="url(#balArrow)"/>
+
+          <!-- the radio gossip strip -->
+          <rect x="12" y="272" width="694" height="116" rx="3" fill="#111115" stroke="#1e1e25" stroke-width="1"/>
+          <text x="26" y="300" font-size="10" fill="#c4f04d">the radio gossip</text>
+          <text x="26" y="320" font-size="9" fill="#7a7880">esp-now</text>
+          <text x="26" y="332" font-size="9" fill="#7a7880">encrypted</text>
+          <text x="26" y="344" font-size="9" fill="#7a7880">1 hz</text>
+          <text x="26" y="356" font-size="9" fill="#4a4850">not on the wire</text>
+
+          <rect x="176" y="292" width="286" height="50" rx="3" fill="#16161c" stroke="#2a2a33" stroke-width="1"/>
+          <text x="319" y="309" text-anchor="middle" font-size="10" fill="#e8e6e3">the backend set</text>
+          <text x="319" y="323" text-anchor="middle" font-size="9" fill="#7a7880">alive · serving · holding an address</text>
+          <text x="319" y="337" text-anchor="middle" font-size="9" fill="#7a7880">rebuilt once a second</text>
+
+          <path d="M208 356 L208 342" stroke="#2a2a33" stroke-width="1" stroke-dasharray="2 4"/>
+          <path d="M282 356 L282 342" stroke="#2a2a33" stroke-width="1" stroke-dasharray="2 4"/>
+          <path d="M356 356 L356 342" stroke="#2a2a33" stroke-width="1" stroke-dasharray="2 4"/>
+          <path d="M430 356 L430 342" stroke="#2a2a33" stroke-width="1" stroke-dasharray="2 4"/>
+          <path d="M240 367 L250 367" stroke="#2a2a33" stroke-width="1" stroke-dasharray="2 4"/>
+          <path d="M314 367 L324 367" stroke="#2a2a33" stroke-width="1" stroke-dasharray="2 4"/>
+          <path d="M388 367 L398 367" stroke="#2a2a33" stroke-width="1" stroke-dasharray="2 4"/>
+
+          <rect x="176" y="356" width="64" height="22" rx="3" fill="#16161c" stroke="#c4f04d" stroke-width="1"/>
+          <circle cx="188" cy="367" r="3" fill="#c4f04d"/>
+          <text x="198" y="370" font-size="9" fill="#c4f04d">otaman</text>
+          <rect x="250" y="356" width="64" height="22" rx="3" fill="#16161c" stroke="#2a2a33" stroke-width="1"/>
+          <circle cx="262" cy="367" r="3" fill="#43e86a"/>
+          <text x="272" y="370" font-size="9" fill="#e8e6e3">kozak 1</text>
+          <rect x="324" y="356" width="64" height="22" rx="3" fill="#16161c" stroke="#2a2a33" stroke-width="1"/>
+          <circle cx="336" cy="367" r="3" fill="#43e86a"/>
+          <text x="346" y="370" font-size="9" fill="#e8e6e3">kozak 2</text>
+          <rect x="398" y="356" width="64" height="22" rx="3" fill="#16161c" stroke="#2a2a33" stroke-width="1"/>
+          <circle cx="410" cy="367" r="3" fill="#43e86a"/>
+          <text x="420" y="370" font-size="9" fill="#e8e6e3">kozak 3</text>
+
+          <text x="490" y="302" font-size="10" fill="#c4f04d">real-time backend discovery</text>
+          <text x="490" y="322" font-size="9" fill="#7a7880">the splicer keeps no list of</text>
+          <text x="490" y="334" font-size="9" fill="#7a7880">backends in config. it learns</text>
+          <text x="490" y="346" font-size="9" fill="#7a7880">them from the radio, and drops</text>
+          <text x="490" y="358" font-size="9" fill="#7a7880">any blade that goes quiet for</text>
+          <text x="490" y="370" font-size="9" fill="#7a7880">three seconds.</text>
+
+        </g>
+      </svg>
+      <p class="diagram-cap">
+        <b>One request, end to end.</b> The otaman splices the raw bytes to the least busy kozak,
+        so the encrypted session runs from your browser straight past the balancer. The backend set
+        comes from the radio - every blade broadcasts its state once a second.
+      </p>
+    </div>
+
+    <div class="diagram reveal" style="margin-top:2px">
+      <svg viewBox="0 0 720 460" xmlns="http://www.w3.org/2000/svg" width="100%" role="img" aria-label="Four stacked panels showing a fleet of four ESP32 serving blades degrading one blade at a time. Panel one, healthy: blade b1 is the otaman, wears the mask on port 443 and splices raw TCP to three kozaky, b2, b3 and b4, each terminating TLS on a LAN-only port. Panel two: b1 is lost and drawn dashed with a red dot, b2 has won the election, wears the mask and balances to two backends; a blade is declared lost 3 seconds after its last heartbeat. Panel three: b1 and b2 are both lost, b3 wears the mask and balances to the single survivor b4. Panel four, solo: b1, b2 and b3 are lost, b4 wears the mask and splices to its own server over loopback, the last line of defence.">
+      <g font-family="ui-monospace,SFMono-Regular,Menlo,monospace">
+      <defs>
+      <marker id="ladderArrow" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#c4f04d"/></marker>
+      </defs>
+
+      <rect x="0" y="0" width="720" height="460" fill="#0e0e12"/>
+
+      <text x="20" y="17" font-size="12" fill="#e8e6e3">failover ladder</text>
+      <text x="138" y="17" font-size="9" fill="#7a7880">four states, one blade lost at a time</text>
+      <text x="700" y="17" font-size="9" fill="#7a7880" text-anchor="end">the mask: one vmac + one ip, the only forwarded address</text>
+
+      <!-- ============ state 1 : healthy ============ -->
+      <rect x="10" y="28" width="700" height="95" rx="3" fill="#111115" stroke="#1e1e25"/>
+      <text x="22" y="48" font-size="12" fill="#c4f04d">1</text>
+      <text x="38" y="48" font-size="11" fill="#e8e6e3">healthy</text>
+      <text x="22" y="64" font-size="9" fill="#7a7880">one otaman splices,</text>
+      <text x="22" y="75" font-size="9" fill="#7a7880">three kozaky serve.</text>
+      <text x="22" y="86" font-size="9" fill="#7a7880">least-connections,</text>
+      <text x="22" y="97" font-size="9" fill="#7a7880">round-robin on ties.</text>
+
+      <circle cx="186" cy="46" r="3" fill="#c4f04d"/>
+      <path d="M186,46 H239 V55" fill="none" stroke="#c4f04d" stroke-width="1.5" marker-end="url(#ladderArrow)"/>
+      <text x="239" y="40" font-size="9" fill="#c4f04d" text-anchor="middle">the mask</text>
+
+      <rect x="186" y="58" width="106" height="36" rx="3" fill="#16161c" stroke="#c4f04d" stroke-width="1.5"/>
+      <circle cx="199" cy="70" r="4" fill="#c4f04d"/>
+      <text x="210" y="74" font-size="11" fill="#c4f04d">otaman</text>
+      <text x="282" y="74" font-size="9" fill="#4a4850" text-anchor="end">b1</text>
+      <text x="196" y="87" font-size="9" fill="#7a7880">splices :443</text>
+
+      <rect x="322" y="58" width="106" height="36" rx="3" fill="#16161c" stroke="#2a2a33"/>
+      <circle cx="335" cy="70" r="4" fill="#43e86a"/>
+      <text x="346" y="74" font-size="11" fill="#e8e6e3">kozak</text>
+      <text x="418" y="74" font-size="9" fill="#4a4850" text-anchor="end">b2</text>
+      <text x="332" y="87" font-size="9" fill="#7a7880">serves tls</text>
+
+      <rect x="458" y="58" width="106" height="36" rx="3" fill="#16161c" stroke="#2a2a33"/>
+      <circle cx="471" cy="70" r="4" fill="#43e86a"/>
+      <text x="482" y="74" font-size="11" fill="#e8e6e3">kozak</text>
+      <text x="554" y="74" font-size="9" fill="#4a4850" text-anchor="end">b3</text>
+      <text x="468" y="87" font-size="9" fill="#7a7880">serves tls</text>
+
+      <rect x="594" y="58" width="106" height="36" rx="3" fill="#16161c" stroke="#2a2a33"/>
+      <circle cx="607" cy="70" r="4" fill="#43e86a"/>
+      <text x="618" y="74" font-size="11" fill="#e8e6e3">kozak</text>
+      <text x="690" y="74" font-size="9" fill="#4a4850" text-anchor="end">b4</text>
+      <text x="604" y="87" font-size="9" fill="#7a7880">serves tls</text>
+
+      <path d="M239,94 V107 H647" fill="none" stroke="#c4f04d" stroke-width="1"/>
+      <path d="M375,107 V97" fill="none" stroke="#c4f04d" stroke-width="1" marker-end="url(#ladderArrow)"/>
+      <path d="M511,107 V97" fill="none" stroke="#c4f04d" stroke-width="1" marker-end="url(#ladderArrow)"/>
+      <path d="M647,107 V97" fill="none" stroke="#c4f04d" stroke-width="1" marker-end="url(#ladderArrow)"/>
+      <text x="443" y="117" font-size="9" fill="#7a7880" text-anchor="middle">the otaman relays raw bytes</text>
+
+      <!-- ============ state 2 : otaman lost ============ -->
+      <rect x="10" y="131" width="700" height="95" rx="3" fill="#111115" stroke="#1e1e25"/>
+      <text x="22" y="151" font-size="12" fill="#c4f04d">2</text>
+      <text x="38" y="151" font-size="11" fill="#e8e6e3">otaman lost</text>
+      <text x="22" y="167" font-size="9" fill="#7a7880">b1 stops beating.</text>
+      <text x="22" y="178" font-size="9" fill="#7a7880">b2 wins the election</text>
+      <text x="22" y="189" font-size="9" fill="#7a7880">and takes the mask.</text>
+      <text x="22" y="200" font-size="9" fill="#ff5555">declared lost after 3 s</text>
+
+      <circle cx="186" cy="149" r="3" fill="#c4f04d"/>
+      <path d="M186,149 H375 V158" fill="none" stroke="#c4f04d" stroke-width="1.5" marker-end="url(#ladderArrow)"/>
+      <text x="375" y="143" font-size="9" fill="#c4f04d" text-anchor="middle">the mask</text>
+
+      <rect x="186" y="161" width="106" height="36" rx="3" fill="#111115" stroke="#2a2a33" stroke-dasharray="3 3"/>
+      <circle cx="199" cy="173" r="4" fill="#ff5555"/>
+      <text x="210" y="177" font-size="11" fill="#4a4850">lost</text>
+      <text x="282" y="177" font-size="9" fill="#4a4850" text-anchor="end">b1</text>
+      <text x="196" y="190" font-size="9" fill="#4a4850">no heartbeat</text>
+
+      <rect x="322" y="161" width="106" height="36" rx="3" fill="#16161c" stroke="#c4f04d" stroke-width="1.5"/>
+      <circle cx="335" cy="173" r="4" fill="#c4f04d"/>
+      <text x="346" y="177" font-size="11" fill="#c4f04d">otaman</text>
+      <text x="418" y="177" font-size="9" fill="#4a4850" text-anchor="end">b2</text>
+      <text x="332" y="190" font-size="9" fill="#7a7880">splices :443</text>
+
+      <rect x="458" y="161" width="106" height="36" rx="3" fill="#16161c" stroke="#2a2a33"/>
+      <circle cx="471" cy="173" r="4" fill="#43e86a"/>
+      <text x="482" y="177" font-size="11" fill="#e8e6e3">kozak</text>
+      <text x="554" y="177" font-size="9" fill="#4a4850" text-anchor="end">b3</text>
+      <text x="468" y="190" font-size="9" fill="#7a7880">serves tls</text>
+
+      <rect x="594" y="161" width="106" height="36" rx="3" fill="#16161c" stroke="#2a2a33"/>
+      <circle cx="607" cy="173" r="4" fill="#43e86a"/>
+      <text x="618" y="177" font-size="11" fill="#e8e6e3">kozak</text>
+      <text x="690" y="177" font-size="9" fill="#4a4850" text-anchor="end">b4</text>
+      <text x="604" y="190" font-size="9" fill="#7a7880">serves tls</text>
+
+      <path d="M375,197 V210 H647" fill="none" stroke="#c4f04d" stroke-width="1"/>
+      <path d="M511,210 V200" fill="none" stroke="#c4f04d" stroke-width="1" marker-end="url(#ladderArrow)"/>
+      <path d="M647,210 V200" fill="none" stroke="#c4f04d" stroke-width="1" marker-end="url(#ladderArrow)"/>
+      <text x="700" y="221" font-size="9" fill="#7a7880" text-anchor="end">relays in flight die with it. the next request lands on b2</text>
+
+      <!-- ============ state 3 : and again ============ -->
+      <rect x="10" y="234" width="700" height="95" rx="3" fill="#111115" stroke="#1e1e25"/>
+      <text x="22" y="254" font-size="12" fill="#c4f04d">3</text>
+      <text x="38" y="254" font-size="11" fill="#e8e6e3">and again</text>
+      <text x="22" y="270" font-size="9" fill="#7a7880">b2 goes too. b3 wins</text>
+      <text x="22" y="281" font-size="9" fill="#7a7880">and wears the mask.</text>
+      <text x="22" y="292" font-size="9" fill="#7a7880">one backend left.</text>
+
+      <circle cx="186" cy="252" r="3" fill="#c4f04d"/>
+      <path d="M186,252 H511 V261" fill="none" stroke="#c4f04d" stroke-width="1.5" marker-end="url(#ladderArrow)"/>
+      <text x="511" y="246" font-size="9" fill="#c4f04d" text-anchor="middle">the mask</text>
+
+      <rect x="186" y="264" width="106" height="36" rx="3" fill="#111115" stroke="#2a2a33" stroke-dasharray="3 3"/>
+      <circle cx="199" cy="276" r="4" fill="#ff5555"/>
+      <text x="210" y="280" font-size="11" fill="#4a4850">lost</text>
+      <text x="282" y="280" font-size="9" fill="#4a4850" text-anchor="end">b1</text>
+      <text x="196" y="293" font-size="9" fill="#4a4850">no heartbeat</text>
+
+      <rect x="322" y="264" width="106" height="36" rx="3" fill="#111115" stroke="#2a2a33" stroke-dasharray="3 3"/>
+      <circle cx="335" cy="276" r="4" fill="#ff5555"/>
+      <text x="346" y="280" font-size="11" fill="#4a4850">lost</text>
+      <text x="418" y="280" font-size="9" fill="#4a4850" text-anchor="end">b2</text>
+      <text x="332" y="293" font-size="9" fill="#4a4850">no heartbeat</text>
+
+      <rect x="458" y="264" width="106" height="36" rx="3" fill="#16161c" stroke="#c4f04d" stroke-width="1.5"/>
+      <circle cx="471" cy="276" r="4" fill="#c4f04d"/>
+      <text x="482" y="280" font-size="11" fill="#c4f04d">otaman</text>
+      <text x="554" y="280" font-size="9" fill="#4a4850" text-anchor="end">b3</text>
+      <text x="468" y="293" font-size="9" fill="#7a7880">splices :443</text>
+
+      <rect x="594" y="264" width="106" height="36" rx="3" fill="#16161c" stroke="#2a2a33"/>
+      <circle cx="607" cy="276" r="4" fill="#43e86a"/>
+      <text x="618" y="280" font-size="11" fill="#e8e6e3">kozak</text>
+      <text x="690" y="280" font-size="9" fill="#4a4850" text-anchor="end">b4</text>
+      <text x="604" y="293" font-size="9" fill="#7a7880">serves tls</text>
+
+      <path d="M511,300 V313 H647" fill="none" stroke="#c4f04d" stroke-width="1"/>
+      <path d="M647,313 V303" fill="none" stroke="#c4f04d" stroke-width="1" marker-end="url(#ladderArrow)"/>
+      <text x="700" y="324" font-size="9" fill="#7a7880" text-anchor="end">roles swap by election</text>
+
+      <!-- ============ state 4 : solo ============ -->
+      <rect x="10" y="337" width="700" height="95" rx="3" fill="#111115" stroke="#1e1e25"/>
+      <text x="22" y="357" font-size="12" fill="#c4f04d">4</text>
+      <text x="38" y="357" font-size="11" fill="#e8e6e3">solo</text>
+      <text x="22" y="373" font-size="9" fill="#7a7880">b4 wears the mask and</text>
+      <text x="22" y="384" font-size="9" fill="#7a7880">splices to its own</text>
+      <text x="22" y="395" font-size="9" fill="#7a7880">server over loopback.</text>
+      <text x="22" y="406" font-size="9" fill="#7a7880">nobody left to balance.</text>
+      <text x="22" y="417" font-size="9" fill="#c4f04d">the last line of defence</text>
+
+      <circle cx="186" cy="355" r="3" fill="#c4f04d"/>
+      <path d="M186,355 H647 V364" fill="none" stroke="#c4f04d" stroke-width="1.5" marker-end="url(#ladderArrow)"/>
+      <text x="647" y="349" font-size="9" fill="#c4f04d" text-anchor="middle">the mask</text>
+
+      <rect x="186" y="367" width="106" height="36" rx="3" fill="#111115" stroke="#2a2a33" stroke-dasharray="3 3"/>
+      <circle cx="199" cy="379" r="4" fill="#ff5555"/>
+      <text x="210" y="383" font-size="11" fill="#4a4850">lost</text>
+      <text x="282" y="383" font-size="9" fill="#4a4850" text-anchor="end">b1</text>
+      <text x="196" y="396" font-size="9" fill="#4a4850">no heartbeat</text>
+
+      <rect x="322" y="367" width="106" height="36" rx="3" fill="#111115" stroke="#2a2a33" stroke-dasharray="3 3"/>
+      <circle cx="335" cy="379" r="4" fill="#ff5555"/>
+      <text x="346" y="383" font-size="11" fill="#4a4850">lost</text>
+      <text x="418" y="383" font-size="9" fill="#4a4850" text-anchor="end">b2</text>
+      <text x="332" y="396" font-size="9" fill="#4a4850">no heartbeat</text>
+
+      <rect x="458" y="367" width="106" height="36" rx="3" fill="#111115" stroke="#2a2a33" stroke-dasharray="3 3"/>
+      <circle cx="471" cy="379" r="4" fill="#ff5555"/>
+      <text x="482" y="383" font-size="11" fill="#4a4850">lost</text>
+      <text x="554" y="383" font-size="9" fill="#4a4850" text-anchor="end">b3</text>
+      <text x="468" y="396" font-size="9" fill="#4a4850">no heartbeat</text>
+
+      <rect x="594" y="367" width="106" height="36" rx="3" fill="#16161c" stroke="#c4f04d" stroke-width="1.5"/>
+      <circle cx="607" cy="379" r="4" fill="#c4f04d"/>
+      <text x="618" y="383" font-size="11" fill="#c4f04d">solo</text>
+      <text x="690" y="383" font-size="9" fill="#4a4850" text-anchor="end">b4</text>
+      <text x="604" y="396" font-size="9" fill="#7a7880">mask + server</text>
+
+      <path d="M627,403 V416 H667 V406" fill="none" stroke="#c4f04d" stroke-width="1" marker-end="url(#ladderArrow)"/>
+      <text x="560" y="422" font-size="9" fill="#7a7880" text-anchor="end">20 of 20 requests still served</text>
+      <text x="647" y="428" font-size="9" fill="#c4f04d" text-anchor="middle">loopback</text>
+
+      <!-- ============ legend ============ -->
+      <path d="M10,437 H710" stroke="#1e1e25" stroke-width="1"/>
+      <circle cx="24" cy="449" r="4" fill="#c4f04d"/>
+      <text x="34" y="452" font-size="9" fill="#7a7880">otaman - wears the mask</text>
+      <circle cx="196" cy="449" r="4" fill="#43e86a"/>
+      <text x="206" y="452" font-size="9" fill="#7a7880">kozak - serves tls</text>
+      <circle cx="392" cy="449" r="4" fill="#ff5555"/>
+      <text x="402" y="452" font-size="9" fill="#7a7880">lost - silent for 3 s</text>
+      <text x="700" y="452" font-size="9" fill="#7a7880" text-anchor="end">esp-now roster, 1 hz</text>
+      </g>
+      </svg>
+      <p class="diagram-cap">
+        <b>The ladder down.</b> A blade is declared lost 3 seconds after its last heartbeat; the
+        next in line wins the election, takes the mask and rebuilds its backend set from the gossip
+        roster. A leader that stands down deliberately closes its relays first; one that dies takes
+        its relays with it. The last blade standing splices to its own server over loopback.
+      </p>
+    </div>
+
+    <p class="section-label reveal" style="margin-top:64px">Resilience</p>
+    <h2 class="section-title reveal">The swarm heals <em>itself</em></h2>
+    <p class="section-intro reveal">
+      Each blade watches its own health, probing its own public port every 7 seconds. The blade
+      that balances watches twice: itself the same way, and the whole fleet through every relay it
+      opens. Either signal can pull a blade out of rotation.
+    </p>
+
+    <div class="diagram reveal">
+      <svg viewBox="0 0 720 380" role="img" aria-label="Diagram of two self-healing mechanisms shown side by side. On the left, self-probing: a blade opens a TCP connection to its own public port on loopback every 7 seconds; after two failures in a row it reports itself as not serving, stops participating in leader election, and the load balancer benches it within 2 seconds; after six failures in a row it crashes on purpose, so the coredump records where its server was stuck, then reboots. On the right, circuit breaking: the otaman splicer fans connections out to backends n2 and n4 while a dashed, muted line shows n3 skipped; n3 sits on the bench because it accepted connections and returned nothing three times running, benched 15 seconds and doubling on repeat up to a 4 minute cap, forgiven at once by any byte returned. A band across the bottom states the principle: benched blades are skipped when picking a backend, but if every backend is benched one is picked anyway.">
+        <defs>
+          <marker id="sh-ah" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 z" fill="#c4f04d"/>
+          </marker>
+          <marker id="sh-ahd" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 z" fill="#4a4850"/>
+          </marker>
+          <marker id="sh-ahw" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 z" fill="#ffb020"/>
+          </marker>
+          <marker id="sh-ahg" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 z" fill="#43e86a"/>
+          </marker>
+        </defs>
+        <g font-family="ui-monospace,SFMono-Regular,Menlo,monospace">
+
+          <!-- ==================== LEFT PANEL: THE SELF-PROBE ==================== -->
+          <rect x="8" y="8" width="340" height="298" rx="3" fill="#111115" stroke="#1e1e25"/>
+          <text x="24" y="30" fill="#c4f04d" font-size="12">self-probing</text>
+          <text x="24" y="45" fill="#7a7880" font-size="9">runs on every blade</text>
+          <line x1="24" y1="52" x2="332" y2="52" stroke="#1e1e25" stroke-width="1"/>
+
+          <!-- the blade, asking itself -->
+          <rect x="24" y="64" width="132" height="54" rx="3" fill="#16161c" stroke="#c4f04d" stroke-width="1.5"/>
+          <circle cx="42" cy="84" r="4" fill="#43e86a"/>
+          <text x="54" y="88" fill="#e8e6e3" font-size="11">a blade</text>
+          <text x="34" y="106" fill="#4a4850" font-size="9">every 7 seconds</text>
+
+          <!-- self-loop: it asks itself -->
+          <path d="M156,80 C 192,72 192,110 158,102" fill="none" stroke="#c4f04d" stroke-width="1.2" marker-end="url(#sh-ah)"/>
+
+          <text x="204" y="74" fill="#e8e6e3" font-size="9">opens a tcp connection</text>
+          <text x="204" y="86" fill="#e8e6e3" font-size="9">to its own public port,</text>
+          <text x="204" y="98" fill="#e8e6e3" font-size="9">over loopback</text>
+
+          <!-- escalation arrow 1 -->
+          <line x1="90" y1="122" x2="90" y2="136" stroke="#4a4850" stroke-width="1.2" stroke-dasharray="3 3" marker-end="url(#sh-ahd)"/>
+
+          <!-- step: 2 failures -->
+          <rect x="24" y="140" width="308" height="60" rx="3" fill="#16161c" stroke="#ffb020"/>
+          <text x="40" y="163" fill="#ffb020" font-size="11">2 in a row</text>
+          <text x="40" y="178" fill="#4a4850" font-size="9">14 seconds</text>
+          <line x1="124" y1="148" x2="124" y2="196" stroke="#1e1e25" stroke-width="1"/>
+          <text x="138" y="153" fill="#e8e6e3" font-size="9">reports itself as not serving and</text>
+          <text x="138" y="166" fill="#e8e6e3" font-size="9">does not participate in leader</text>
+          <text x="138" y="179" fill="#e8e6e3" font-size="9">election. the load balancer</text>
+    <text x="138" y="192" fill="#e8e6e3" font-size="9">benches the blade within 2 s.</text>
+
+          <!-- escalation arrow 2 -->
+          <line x1="90" y1="206" x2="90" y2="218" stroke="#4a4850" stroke-width="1.2" stroke-dasharray="3 3" marker-end="url(#sh-ahd)"/>
+
+          <!-- step: 6 failures -->
+          <rect x="24" y="222" width="308" height="62" rx="3" fill="#16161c" stroke="#ff5555"/>
+          <text x="40" y="248" fill="#ff5555" font-size="11">6 in a row</text>
+          <text x="40" y="263" fill="#4a4850" font-size="9">42 seconds</text>
+          <line x1="124" y1="230" x2="124" y2="276" stroke="#1e1e25" stroke-width="1"/>
+          <text x="138" y="240" fill="#e8e6e3" font-size="9">it crashes on purpose, so the</text>
+          <text x="138" y="253" fill="#e8e6e3" font-size="9">coredump records where its server</text>
+          <text x="138" y="266" fill="#43e86a" font-size="9">was stuck, then reboots.</text>
+
+          <!-- ==================== RIGHT PANEL: THE CIRCUIT BREAKER ==================== -->
+          <rect x="372" y="8" width="340" height="298" rx="3" fill="#111115" stroke="#1e1e25"/>
+          <text x="388" y="30" fill="#c4f04d" font-size="12">circuit breaker</text>
+          <text x="388" y="45" fill="#7a7880" font-size="9">runs on the balancer</text>
+          <line x1="388" y1="52" x2="696" y2="52" stroke="#1e1e25" stroke-width="1"/>
+
+          <!-- the balancer -->
+          <rect x="447" y="62" width="190" height="46" rx="3" fill="#16161c" stroke="#c4f04d" stroke-width="1.5"/>
+          <circle cx="465" cy="76" r="4" fill="#c4f04d"/>
+          <text x="477" y="80" fill="#e8e6e3" font-size="11">the otaman · splicer</text>
+          <text x="465" y="96" fill="#7a7880" font-size="9">counts what comes back</text>
+
+          <!-- fan-out: two served, one skipped -->
+          <path d="M542,108 L542,124 L436,124 L436,134" fill="none" stroke="#c4f04d" stroke-width="1.2" marker-end="url(#sh-ah)"/>
+          <path d="M542,108 L542,134" fill="none" stroke="#4a4850" stroke-width="1.2" stroke-dasharray="3 3" marker-end="url(#sh-ahd)"/>
+          <path d="M542,108 L542,124 L648,124 L648,134" fill="none" stroke="#c4f04d" stroke-width="1.2" marker-end="url(#sh-ah)"/>
+
+          <!-- backends -->
+          <rect x="388" y="140" width="96" height="56" rx="3" fill="#16161c" stroke="#2a2a33"/>
+          <circle cx="404" cy="158" r="4" fill="#43e86a"/>
+          <text x="416" y="162" fill="#e8e6e3" font-size="11">n2</text>
+          <text x="398" y="181" fill="#4a4850" font-size="9">serving</text>
+
+          <rect x="494" y="140" width="96" height="56" rx="3" fill="#16161c" stroke="#ffb020"/>
+          <circle cx="510" cy="158" r="4" fill="#ffb020"/>
+          <text x="522" y="162" fill="#e8e6e3" font-size="11">n3</text>
+          <text x="504" y="181" fill="#ffb020" font-size="9">benched</text>
+
+          <rect x="600" y="140" width="96" height="56" rx="3" fill="#16161c" stroke="#2a2a33"/>
+          <circle cx="616" cy="158" r="4" fill="#43e86a"/>
+          <text x="628" y="162" fill="#e8e6e3" font-size="11">n4</text>
+          <text x="610" y="181" fill="#4a4850" font-size="9">serving</text>
+
+          <!-- onto the bench, and off it -->
+          <line x1="515" y1="198" x2="515" y2="218" stroke="#ffb020" stroke-width="1.2" marker-end="url(#sh-ahw)"/>
+          <line x1="570" y1="218" x2="570" y2="198" stroke="#43e86a" stroke-width="1.2" marker-end="url(#sh-ahg)"/>
+
+          <!-- the bench -->
+          <rect x="420" y="220" width="276" height="56" rx="3" fill="#0e0e12" stroke="#ffb020" stroke-dasharray="3 3"/>
+          <text x="436" y="241" fill="#ffb020" font-size="11">the bench</text>
+          <line x1="530" y1="228" x2="530" y2="268" stroke="#1e1e25" stroke-width="1"/>
+          <text x="546" y="238" fill="#e8e6e3" font-size="9">in: 3 empty replies</text>
+          <text x="546" y="251" fill="#43e86a" font-size="9">out: any byte, at once</text>
+          <text x="546" y="264" fill="#ffb020" font-size="9">15 s, doubling, 4 min cap</text>
+
+          <!-- ==================== THE PRINCIPLE ==================== -->
+          <rect x="8" y="316" width="704" height="56" rx="3" fill="#16161c" stroke="#2a2a33"/>
+          <line x1="10" y1="319" x2="10" y2="369" stroke="#c4f04d" stroke-width="3"/>
+          <text x="360" y="341" fill="#7a7880" font-size="12" text-anchor="middle">benched blades are <tspan fill="#c4f04d">skipped</tspan> when picking a backend</text>
+          <text x="360" y="358" fill="#4a4850" font-size="9" text-anchor="middle">if every backend is benched, one is picked anyway - the bench never turns a visitor away</text>
+        </g>
+      </svg>
+      <p class="diagram-cap">
+        <b>Two health checks.</b> Each blade opens a TCP connection to its own public port every
+        7 seconds: two failures and it stands down, six and it crashes on purpose so the coredump
+        shows where its server was stuck. The balancer separately benches any backend that accepts
+        connections and returns nothing three times running - 15 seconds, doubling to a 4 minute
+        cap. One byte back clears it.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ PRINCIPLES ═══ -->
+<!-- ═══ THE GLASS ═══ -->
+<section id="glass">
+  <div class="container">
+    <p class="section-label reveal">On the glass</p>
+    <h2 class="section-title reveal">The swarm <em>watches itself</em></h2>
+    <p class="section-intro reveal">
+      Two touchscreens and a strip of light, all fed by the same 1&nbsp;Hz heartbeat the blades
+      already send each other. No polling, no server, no dashboard in a browser somewhere -
+      the instruments are part of the machine.
+    </p>
+
+    <div class="glass-grid reveal">
+
+      <div class="glass">
+        <h3>The Pysar&rsquo;s dashboard</h3>
+        <div class="glass-sub">2.8&Prime; TFT &middot; the chronicler</div>
+        <div class="screen-frame">
+          <svg viewBox="0 0 240 320" role="img" aria-label="The 2.8 inch screen: fleet identity, per-node table with signal and delivery, footer statistics and a mirror of the LED rail.">
+            <rect width="240" height="320" fill="#101014"/>
+            <text x="8" y="20" font-size="15" fill="#c4f04d" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" letter-spacing=".08em">IVAN BOHUN</text>
+            <text x="8" y="36" font-size="11" fill="#4a4850" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">Pysar</text>
+            <text x="8" y="54" font-size="11" fill="#c4f04d" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">@ <tspan fill="#7a7880">the mask</tspan></text>
+            <text x="8" y="72" font-size="11" fill="#7a7880" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">loss <tspan fill="#43e86a">0%</tspan></text>
+            <line x1="8" y1="82" x2="232" y2="82" stroke="#22222b"/>
+            <g font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="9.5">
+              <text x="8" y="98" fill="#4a4850">the mac address</text>
+              <g><circle cx="12" cy="114" r="3" fill="#43e86a"/><text x="22" y="118" fill="#c4f04d">N1 otaman</text><text x="150" y="118" fill="#7a7880">-27</text><text x="182" y="118" fill="#7a7880">100%</text><text x="216" y="118" fill="#7a7880">5h</text></g>
+              <g><circle cx="12" cy="130" r="3" fill="#43e86a"/><text x="22" y="134" fill="#e8e6e3">N2 kozak</text><text x="150" y="134" fill="#7a7880">-26</text><text x="182" y="134" fill="#7a7880">100%</text><text x="216" y="134" fill="#7a7880">5h</text></g>
+              <g><circle cx="12" cy="146" r="3" fill="#43e86a"/><text x="22" y="150" fill="#e8e6e3">N3 kozak</text><text x="150" y="150" fill="#7a7880">-32</text><text x="182" y="150" fill="#7a7880">99%</text><text x="216" y="150" fill="#7a7880">5h</text></g>
+              <g><circle cx="12" cy="162" r="3" fill="#43e86a"/><text x="22" y="166" fill="#e8e6e3">N4 kozak</text><text x="150" y="166" fill="#7a7880">-24</text><text x="182" y="166" fill="#7a7880">100%</text><text x="216" y="166" fill="#7a7880">5h</text></g>
+              <g><circle cx="12" cy="178" r="3" fill="#43e86a"/><text x="22" y="182" fill="#7a7880">Display pysar</text><text x="150" y="182" fill="#7a7880">--</text><text x="182" y="182" fill="#7a7880">--</text><text x="216" y="182" fill="#7a7880">2h</text></g>
+              <g><circle cx="12" cy="194" r="3" fill="#43e86a"/><text x="22" y="198" fill="#7a7880">Mission kobzar</text><text x="150" y="198" fill="#7a7880">-20</text><text x="182" y="198" fill="#7a7880">100%</text><text x="216" y="198" fill="#7a7880">1h</text></g>
+            </g>
+            <line x1="8" y1="208" x2="232" y2="208" stroke="#22222b"/>
+            <g font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="13">
+              <text x="8" y="228" fill="#43e86a">6 / 6 up<tspan fill="#4a4850">  gen 1</tspan></text>
+              <text x="8" y="248" fill="#e8e6e3">1284 req  8 ms</text>
+              <text x="8" y="268" fill="#e8e6e3">avg rssi -26</text>
+            </g>
+            <text x="8" y="286" font-size="9.5" fill="#4a4850" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">RAIL <tspan fill="#43e86a">DMA</tspan>  6px cap25% io4</text>
+            <g>
+              <rect x="8"  y="296" width="16" height="16" rx="3" fill="#00ff00"/>
+              <rect x="30" y="296" width="16" height="16" rx="3" fill="#e8e6e3"/>
+              <rect x="52" y="296" width="16" height="16" rx="3" fill="#e8e6e3"/>
+              <rect x="74" y="296" width="16" height="16" rx="3" fill="#e8e6e3"/>
+              <rect x="96" y="296" width="16" height="16" rx="3" fill="#3d5ce0"/>
+              <rect x="118" y="296" width="16" height="16" rx="3" fill="#8d4de0"/>
+            </g>
+          </svg>
+        </div>
+        <p>
+          Identity, the vMAC, every member with signal strength, delivery ratio and uptime, then
+          quorum, request count, latency and average RSSI. The six chips along the bottom mirror
+          the physical rail, pixel for pixel.
+        </p>
+      </div>
+
+      <div class="glass">
+        <h3>The rail tells the truth</h3>
+        <div class="glass-sub">SK6812 RGBW &middot; six pixels</div>
+        <div class="screen-frame" style="padding:26px 12px">
+          <svg viewBox="0 0 300 132" role="img" aria-label="The LED rail: six pixels, one per member, showing the boot parade and the role colours.">
+            <rect x="10" y="30" width="280" height="34" rx="6" fill="#0e0e13" stroke="#22222b"/>
+            <g>
+              <circle class="rail-dot" cx="34"  cy="47" r="9" fill="#00ff00" style="animation-delay:0s"/>
+              <circle class="rail-dot" cx="79"  cy="47" r="9" fill="#e8e6e3" style="animation-delay:.7s"/>
+              <circle class="rail-dot" cx="124" cy="47" r="9" fill="#e8e6e3" style="animation-delay:1.4s"/>
+              <circle class="rail-dot" cx="169" cy="47" r="9" fill="#e8e6e3" style="animation-delay:2.1s"/>
+              <circle class="rail-dot" cx="214" cy="47" r="9" fill="#3d5ce0" style="animation-delay:2.8s"/>
+              <circle class="rail-dot" cx="259" cy="47" r="9" fill="#8d4de0" style="animation-delay:3.5s"/>
+            </g>
+            <g font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="8" fill="#4a4850" text-anchor="middle">
+              <text x="34" y="80">N1</text><text x="79" y="80">N2</text><text x="124" y="80">N3</text>
+              <text x="169" y="80">N4</text><text x="214" y="80">Display</text><text x="259" y="80">Mission</text>
+            </g>
+            <g font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="9">
+              <circle cx="22" cy="103" r="5" fill="#ff2200"/><text x="34" y="106" fill="#7a7880">lost</text>
+              <circle cx="92" cy="103" r="5" fill="#ff8c00"/><text x="104" y="106" fill="#7a7880">firmware release</text>
+              <circle cx="212" cy="103" r="5" fill="#00ff00"/><text x="224" y="106" fill="#7a7880">wears the mask</text>
+            </g>
+          </svg>
+        </div>
+        <p>
+          Green follows the mask wherever the election moves it. Pull a blade&rsquo;s power and its
+          pixel turns red inside three seconds; push a release and it holds amber for the length of
+          the transfer.
+        </p>
+        <div class="screen-frame" style="padding:20px 12px;margin-top:16px">
+          <svg viewBox="0 0 300 84" role="img" aria-label="The boot parade: four dots walk the rail in turn, white then green then blue then red.">
+            <rect x="10" y="16" width="280" height="34" rx="6" fill="#0e0e13" stroke="#22222b"/>
+            <g id="parade">
+              <circle cx="34"  cy="33" r="8" fill="#e8e6e3" opacity=".08"/>
+              <circle cx="79"  cy="33" r="8" fill="#e8e6e3" opacity=".08"/>
+              <circle cx="124" cy="33" r="8" fill="#e8e6e3" opacity=".08"/>
+              <circle cx="169" cy="33" r="8" fill="#e8e6e3" opacity=".08"/>
+              <circle cx="214" cy="33" r="8" fill="#e8e6e3" opacity=".08"/>
+              <circle cx="259" cy="33" r="8" fill="#e8e6e3" opacity=".08"/>
+              <circle cx="34" cy="33" r="8" class="parade-dot">
+                <animate attributeName="cx" values="34;34;79;124;169;214;259;34" dur="2.8s" repeatCount="indefinite" calcMode="discrete"/>
+                <animate attributeName="fill" values="#ffffff;#ffffff;#ffffff;#ffffff;#ffffff;#ffffff;#ffffff;#00ff00;#00ff00;#00ff00;#00ff00;#00ff00;#00ff00;#00ff00;#3d5ce0;#3d5ce0;#3d5ce0;#3d5ce0;#3d5ce0;#3d5ce0;#3d5ce0;#ff2200;#ff2200;#ff2200;#ff2200;#ff2200;#ff2200;#ff2200;#ffffff" dur="11.2s" repeatCount="indefinite" calcMode="discrete"/>
+                <animate attributeName="opacity" values="1;.35;1;1;1;1;1;1" dur="2.8s" repeatCount="indefinite" calcMode="discrete"/>
+              </circle>
+            </g>
+            <text x="150" y="72" font-size="9" fill="#4a4850" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">the boot parade &middot; white &rarr; green &rarr; blue &rarr; red</text>
+          </svg>
+        </div>
+        <p>
+          Boot walks four dots - white, green, blue, red - proving every joint is
+          functional before the roster paints.
+        </p>
+      </div>
+
+      <div class="glass">
+        <h3>The Kobzar&rsquo;s panel</h3>
+        <div class="glass-sub">4.3&Prime; touch &middot; keeps the chronicle</div>
+        <div class="screen-frame">
+          <svg viewBox="0 0 320 190" role="img" aria-label="The 4.3 inch touchscreen: health badge, release status, per-node sparklines and the chronicle of events.">
+            <rect width="320" height="190" fill="#101014"/>
+            <text x="10" y="22" font-size="14" fill="#c4f04d" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" letter-spacing=".06em">IVAN BOHUN</text>
+            <rect x="118" y="10" width="18" height="12" fill="#0057b7"/><rect x="118" y="16" width="18" height="6" fill="#ffd700"/>
+            <rect x="150" y="9" width="52" height="15" rx="3" fill="#0d1a0d" stroke="#43e86a"/>
+            <text x="176" y="20" font-size="9" fill="#43e86a" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">HEALTHY</text>
+            <rect x="238" y="6" width="74" height="24" rx="3" fill="#1a1408" stroke="#f0a04d"/>
+            <text x="275" y="16" font-size="8" fill="#f0a04d" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">RELEASE</text>
+            <text x="275" y="26" font-size="8" fill="#f0a04d" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">ONGOING 64%</text>
+            <g font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="9">
+              <g><circle cx="16" cy="48" r="3.5" fill="#43e86a"/><text x="26" y="51" fill="#c4f04d">N1 otaman</text>
+                 <polyline points="150,52 166,48 182,50 198,44 214,47 230,42 246,45 262,40" fill="none" stroke="#43e86a" stroke-width="1.2"/><text x="296" y="51" fill="#7a7880">100%</text></g>
+              <g><circle cx="16" cy="70" r="3.5" fill="#43e86a"/><text x="26" y="73" fill="#e8e6e3">N2 kozak</text>
+                 <polyline points="150,74 166,71 182,73 198,69 214,72 230,68 246,70 262,66" fill="none" stroke="#43e86a" stroke-width="1.2"/><text x="296" y="73" fill="#7a7880">100%</text></g>
+              <g><circle cx="16" cy="92" r="3.5" fill="#f0a04d"/><text x="26" y="95" fill="#e8e6e3">N3 kozak</text>
+                 <polyline points="150,96 166,93 182,95 198,90 214,94 230,89 246,92 262,88" fill="none" stroke="#f0a04d" stroke-width="1.2"/><text x="296" y="95" fill="#f0a04d">64%</text></g>
+              <g><circle cx="16" cy="114" r="3.5" fill="#43e86a"/><text x="26" y="117" fill="#e8e6e3">N4 kozak</text>
+                 <polyline points="150,118 166,115 182,117 198,113 214,116 230,112 246,114 262,110" fill="none" stroke="#43e86a" stroke-width="1.2"/><text x="296" y="117" fill="#7a7880">99%</text></g>
+            </g>
+            <line x1="10" y1="130" x2="310" y2="130" stroke="#22222b"/>
+            <text x="10" y="144" font-size="8.5" fill="#4a4850" font-family="ui-monospace,SFMono-Regular,Menlo,monospace">THE CHRONICLE</text>
+            <g font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="8" fill="#7a7880">
+              <text x="10" y="158">18:42  N3 firmware release</text>
+              <text x="10" y="170">18:39  reign record 6h 12m</text>
+              <text x="10" y="182">17:02  N1 claimed the mask</text>
+            </g>
+          </svg>
+        </div>
+        <p>
+          A wider glass for wider truth: health badge, live release progress, sixty-sample
+          sparklines per node and a scrolling chronicle of everything the swarm has done.
+        </p>
+        <div class="screen-frame" style="padding:20px 12px;margin-top:16px">
+          <svg viewBox="0 0 300 84" role="img" aria-label="This very page as a miniature strip, flick-scrolled by a finger on the panel.">
+            <rect x="10" y="10" width="280" height="56" rx="6" fill="#0e0e13" stroke="#22222b"/>
+            <clipPath id="pageClip"><rect x="16" y="14" width="268" height="52" rx="4"/></clipPath>
+            <g clip-path="url(#pageClip)">
+              <g class="chron-scroll">
+                <animateTransform attributeName="transform" type="translate"
+                  values="0 0;0 -38;0 -38;0 -74;0 -74;0 -106;0 -106;0 -140"
+                  keyTimes="0;0.085;0.245;0.33;0.49;0.575;0.735;1"
+                  calcMode="spline"
+                  keySplines="0.12 0.8 0.2 1;0 0 1 1;0.12 0.8 0.2 1;0 0 1 1;0.12 0.8 0.2 1;0 0 1 1;0.12 0.8 0.2 1"
+                  dur="6.4s" repeatCount="indefinite"/>
+                <g transform="translate(0,18)">
+                  <rect x="24" y="0" width="118" height="7" rx="1.5" fill="#e8e6e3"/>
+                  <rect x="24" y="11" width="88" height="7" rx="1.5" fill="#e8e6e3"/>
+                  <rect x="116" y="11" width="30" height="7" rx="1.5" fill="#c4f04d"/>
+                  <rect x="24" y="26" width="230" height="2.5" fill="#3a3a44"/>
+                  <rect x="24" y="32" width="244" height="2.5" fill="#3a3a44"/>
+                  <rect x="24" y="38" width="176" height="2.5" fill="#3a3a44"/>
+                  <rect x="24" y="48" width="42" height="11" rx="2" fill="#15151b" stroke="#22222b" stroke-width=".6"/>
+                  <rect x="72" y="48" width="42" height="11" rx="2" fill="#15151b" stroke="#22222b" stroke-width=".6"/>
+                  <rect x="120" y="48" width="42" height="11" rx="2" fill="#15151b" stroke="#22222b" stroke-width=".6"/>
+                  <rect x="168" y="48" width="42" height="11" rx="2" fill="#15151b" stroke="#22222b" stroke-width=".6"/>
+                  <rect x="28" y="52" width="14" height="3" fill="#c4f04d"/>
+                  <rect x="24" y="66" width="230" height="28" rx="3" fill="#101016" stroke="#22222b" stroke-width=".6"/>
+                  <circle cx="42" cy="80" r="2.5" fill="#43e86a"/><circle cx="60" cy="80" r="2.5" fill="#43e86a"/><circle cx="78" cy="80" r="2.5" fill="#43e86a"/>
+                  <path d="M150,86 Q190,70 244,76" fill="none" stroke="#c4f04d" stroke-width="1.2"/>
+                  <circle cx="28" cy="102" r="2" fill="#43e86a"/><rect x="36" y="100.5" width="216" height="2.5" fill="#2a2a33"/>
+                  <circle cx="28" cy="110" r="2" fill="#43e86a"/><rect x="36" y="108.5" width="216" height="2.5" fill="#2a2a33"/>
+                  <circle cx="28" cy="118" r="2" fill="#f0a04d"/><rect x="36" y="116.5" width="216" height="2.5" fill="#2a2a33"/>
+                  <rect x="86" y="128" width="128" height="3.5" fill="#55555f"/>
+                  <rect x="102" y="134" width="96" height="3.5" fill="#55555f"/>
+                </g>
+                <g transform="translate(0,158)">
+                  <rect x="24" y="0" width="118" height="7" rx="1.5" fill="#e8e6e3"/>
+                  <rect x="24" y="11" width="88" height="7" rx="1.5" fill="#e8e6e3"/>
+                  <rect x="116" y="11" width="30" height="7" rx="1.5" fill="#c4f04d"/>
+                  <rect x="24" y="26" width="230" height="2.5" fill="#3a3a44"/>
+                  <rect x="24" y="32" width="244" height="2.5" fill="#3a3a44"/>
+                  <rect x="24" y="38" width="176" height="2.5" fill="#3a3a44"/>
+                  <rect x="24" y="48" width="42" height="11" rx="2" fill="#15151b" stroke="#22222b" stroke-width=".6"/>
+                  <rect x="72" y="48" width="42" height="11" rx="2" fill="#15151b" stroke="#22222b" stroke-width=".6"/>
+                  <rect x="120" y="48" width="42" height="11" rx="2" fill="#15151b" stroke="#22222b" stroke-width=".6"/>
+                  <rect x="168" y="48" width="42" height="11" rx="2" fill="#15151b" stroke="#22222b" stroke-width=".6"/>
+                  <rect x="28" y="52" width="14" height="3" fill="#c4f04d"/>
+                  <rect x="24" y="66" width="230" height="28" rx="3" fill="#101016" stroke="#22222b" stroke-width=".6"/>
+                  <circle cx="42" cy="80" r="2.5" fill="#43e86a"/><circle cx="60" cy="80" r="2.5" fill="#43e86a"/><circle cx="78" cy="80" r="2.5" fill="#43e86a"/>
+                  <path d="M150,86 Q190,70 244,76" fill="none" stroke="#c4f04d" stroke-width="1.2"/>
+                  <circle cx="28" cy="102" r="2" fill="#43e86a"/><rect x="36" y="100.5" width="216" height="2.5" fill="#2a2a33"/>
+                  <circle cx="28" cy="110" r="2" fill="#43e86a"/><rect x="36" y="108.5" width="216" height="2.5" fill="#2a2a33"/>
+                  <circle cx="28" cy="118" r="2" fill="#f0a04d"/><rect x="36" y="116.5" width="216" height="2.5" fill="#2a2a33"/>
+                  <rect x="86" y="128" width="128" height="3.5" fill="#55555f"/>
+                  <rect x="102" y="134" width="96" height="3.5" fill="#55555f"/>
+                </g>
+              </g>
+              <circle class="chron-finger" cx="272" cy="58" r="5" fill="#e8e6e3" opacity="0">
+                <animate attributeName="opacity" values="0;.28;0;0;.28;0;0;.28;0;0;.28;0;0" keyTimes="0;0.04;0.1;0.245;0.29;0.35;0.49;0.535;0.6;0.735;0.78;0.85;1" dur="6.4s" repeatCount="indefinite"/>
+                <animate attributeName="cy" values="58;34;58;34;58;34;58;34;58" keyTimes="0;0.085;0.245;0.33;0.49;0.575;0.735;0.82;1" dur="6.4s" repeatCount="indefinite"/>
+              </circle>
+            </g>
+            <text x="150" y="79" font-size="9" fill="#4a4850" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">this very page, baked to a strip &middot; scrolled by finger</text>
+          </svg>
+        </div>
+        <p>
+          It also renders this very page, baked to a pixel strip and scrolled by finger.
+        </p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ═══ THE BUILD ═══ -->
+<section id="build">
+  <div class="container">
+    <p class="section-label reveal">Made by hand</p>
+    <h2 class="section-title reveal">Two hundred and ninety-two <em>joints</em></h2>
+    <p class="section-intro reveal">
+      None of this arrived assembled (unintentionally). Every header, every breakout, every wire
+      in the level shifter was soldered on a kitchen table by someone who had barely held a
+      soldering iron in July&nbsp;2026, and every joint was proven with a multimeter before it was
+      ever given power.
+    </p>
+
+    <div class="build-grid reveal">
+      <div class="build-cell"><b>186</b><span>header pins across six blades</span></div>
+      <div class="build-cell"><b>44</b><span>joints on the display node</span></div>
+      <div class="build-cell"><b>44</b><span>on the level-shifter board</span></div>
+      <div class="build-cell"><b>16</b><span>USB-C breakout joints</span></div>
+      <div class="build-cell"><b>2</b><span>solder-bridge board mods</span></div>
+    </div>
+
+    <div class="build-steps reveal">
+      <div class="build-step">
+        <div class="bs-n">01</div>
+        <h4>Headers, six times over</h4>
+        <p>
+          Fifteen-pin strips down both flanks of every blade, soldered from the jack side so the
+          pins rise where the Duponts land. Continuity beeped pin by pin, and a diode-drop baseline
+          taken on all nine boards - 0.486 to 0.503&nbsp;V, tight enough to prove no cold joints.
+        </p>
+      </div>
+      <div class="build-step">
+        <div class="bs-n">02</div>
+        <h4>Power, broken out</h4>
+        <p>
+          Four USB-C breakouts pinned by hand, and every one of them carries all four wires now:
+          power, ground, and both data lines into the ESP32-S3&rsquo;s native USB. The data pairs
+          were an afterthought that became doctrine the night a bad update bricked the fleet&rsquo;s
+          own update door - since then each blade flashes from its own port, no dongle, no
+          harness-swapping, and one board&rsquo;s reversed pin order is why every pair met a
+          multimeter before it met a computer.
+        </p>
+      </div>
+      <div class="build-step">
+        <div class="bs-n">03</div>
+        <h4>The screens, plugged not soldered</h4>
+        <p>
+          A rainbow of female-to-female Duponts carries SPI, backlight and touch from the DevKitC to
+          the 2.8&Prime; glass. Nothing on a display is permanent: every link pulls apart, so
+          replacing a dead panel needs no soldering iron.
+        </p>
+      </div>
+      <div class="build-step">
+        <div class="bs-n">04</div>
+        <h4>The shifter board</h4>
+        <p>
+          The blades speak 3.3&nbsp;volts; the LEDs listen for five. A 74AHCT125 quad buffer on a
+          solderable breadboard translates - fourteen chip legs, eleven jumpers routed hole by
+          hole, a 330&nbsp;&Omega; resistor to soften the edge, and six header pins so every wire
+          beyond it stays push-fit.
+        </p>
+      </div>
+      <div class="build-step">
+        <div class="bs-n">05</div>
+        <h4>Measured, then powered</h4>
+        <p>
+          Thirty measurements before the first electron: no rail shorted to another, eleven grounds
+          beeping to one net, five volts where five volts belonged, and 325.6&nbsp;&Omega; on the
+          signal path. The board was correct by instrument before it was ever plugged in.
+        </p>
+      </div>
+      <div class="build-step">
+        <div class="bs-n">06</div>
+        <h4>Two deliberate bridges</h4>
+        <p>
+          The display board&rsquo;s 5&nbsp;V pin turned out to be isolated by design - a clone
+          quirk that starved the rail at 2.6&nbsp;volts and kept it dark. Two blobs of solder across
+          the manufacturer&rsquo;s own jumper pads joined it to USB power, and the rail lit on the
+          first try afterwards.
+        </p>
+      </div>
+      <div class="build-step">
+        <div class="bs-n">07</div>
+        <h4>A kurin for every blade</h4>
+        <p>
+          Next, the naked boards get walls: each blade moves into its own 3D-printed kurin - a
+          ventilated barracks it slides into like a drawer, RJ45 nose out, a wire bay for the
+          breakout and the slack. Case by printed case, the swarm
+          becomes a frankenstein imitation of manufacturing.
+        </p>
+      </div>
+      <div class="build-step">
+        <div class="bs-n">08</div>
+        <h4>The Sich, racked to spec</h4>
+        <p>
+          A ten-inch rack drawn to our own spec: kurins side by side on one shelf, jacks aft
+          toward the switch, both screens facing forward through a CNC-cut smoked-acrylic face.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="principles">
+  <div class="container">
+    <p class="section-label reveal">Principles</p>
+    <h2 class="section-title reveal">Rules the swarm <em>lives by</em></h2>
+    <div class="grid-cards">
+      <div class="card reveal">
+        <h3>Wire silence</h3>
+        <p>Only the node wearing the mask answers the world. The other blades receive their visitors through it over the LAN and send nothing outward on their own, so from outside the swarm looks like a single quiet machine.</p>
+      </div>
+      <div class="card reveal">
+        <h3>Crash only</h3>
+        <p>Nothing shuts down gracefully because nothing needs to. There is no state worth preserving on any node. Pulling the plug is a supported operation and the only recovery procedure is to boot.</p>
+      </div>
+      <div class="card reveal">
+        <h3>Own the identity</h3>
+        <p>The address is a locally administered MAC chosen by hand and passed between blades by election. No provider issued it and none can revoke it.</p>
+      </div>
+      <div class="card reveal">
+        <h3>One resource</h3>
+        <p>The entire site is a single brotli-compressed HTML file with no external fonts, scripts, trackers or CDNs. A first-time visitor pays for one TLS handshake and one response.</p>
+      </div>
+      <div class="card reveal">
+        <h3>Deterministic election</h3>
+        <p>The lowest numbered candidate that is healthy both on radio and network leads. Every node computes the same answer from the same heartbeats, making leader election deterministic.</p>
+      </div>
+      <div class="card reveal">
+        <h3>Reachable forever</h3>
+        <p>Every blade boots into its own identity before it is eligible to lead, so a bad release can always be replaced remotely. The swarm can be rebuilt over the air without anyone touching a cable.</p>
+      </div>
+      <div class="card reveal">
+        <h3>Prove you can serve</h3>
+        <p>Every blade routinely opens a TCP connection to probe its own public port. Two failures and it stands down from the election; six and it reboots. A blade that cannot reach itself has no business receiving visitors.</p>
+      </div>
+      <div class="card reveal">
+        <h3>Judge by outcomes</h3>
+        <p>The balancer ignores what a blade claims about itself. A backend that goes silent on three relays in a row is benched for 15 seconds, and each repeat doubles the bench, up to four minutes.</p>
+      </div>
+      <div class="card reveal">
+        <h3>Degrade to solo</h3>
+        <p>Lose the leader and the next blade becomes one in seconds. Keep losing blades and the backend set shrinks with the fleet, down to the last survivor splicing to its own server over loopback.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ CV ═══ -->
+<section id="cv">
+  <div class="container">
+    <p class="section-label reveal">Who built it</p>
+    <h2 class="section-title reveal">Kyrylo <em>Novotarskyi</em></h2>
+    <p class="section-intro reveal">
+      Principal Engineer in London, fifteen years in distributed systems, performance engineering
+      and the kind of reliability work that &ldquo;only goes in one direction&rdquo; &#x2191;.
+      The swarm above is the sort of thing I do for fun. Below is what I have done at work.
+    </p>
+
+    <div class="reveal">
+      <div class="cv-row">
+        <div class="cv-when">2026 &rarr; now</div>
+        <div class="cv-what">
+          <h4>TBA</h4>
+          <span class="cv-role">Member of Technical Staff</span>
+        </div>
+      </div>
+
+      <div class="cv-row">
+        <div class="cv-when">2024 &rarr; 2026</div>
+        <div class="cv-what">
+          <h4>Pump.fun</h4>
+          <span class="cv-role">Founding / Principal Engineer</span>
+          <p>
+            Tenth engineer in. Shaped hiring and grew the team past seventy. Built the Community
+            Integrity vertical from the ground up. Led the first Platform Engineering group to
+            rebuild the mission-critical Coin infrastructure carrying most of the traffic.
+          </p>
+          <div class="cv-metrics">
+            <div class="cv-metric"><b>$10m+</b><span>Annual savings</span></div>
+            <div class="cv-metric"><b>3 to 7x</b><span>Perf gains</span></div>
+            <div class="cv-metric"><b>99.999%</b><span>Availability</span></div>
+            <div class="cv-metric"><b>10 to 70+</b><span>Team scale</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cv-row">
+        <div class="cv-when">2022 &rarr; 2024</div>
+        <div class="cv-what">
+          <h4>Deliveroo</h4>
+          <span class="cv-role">Senior Staff Engineer</span>
+          <p>
+            Led Trust engineering against fraud and abuse at scale, led the company-wide compute
+            efficiency programme, architected and delivered the real-time ML feature platform
+            behind novel Fraud Detection models into production.
+          </p>
+        </div>
+      </div>
+
+      <div class="cv-row">
+        <div class="cv-when">2019 &rarr; 2022</div>
+        <div class="cv-what">
+          <h4>Kobalt Music Group</h4>
+          <span class="cv-role">Principal Engineer</span>
+          <p>
+            Sole Principal across an eighty-person engineering org. Took the Royalty Processing
+            Engine from on-premise Oracle PL/SQL to a fully streamed AWS pipeline, designed, built and delivered the
+            Chain of Title system that the business runs on. Primary technical IC for due diligence
+            through the sale to Francisco Partners.
+          </p>
+        </div>
+      </div>
+
+      <div class="cv-row">
+        <div class="cv-when">2018 &rarr; 2019</div>
+        <div class="cv-what">
+          <h4>Amazon Prime Video</h4>
+          <span class="cv-role">Senior Software Engineer</span>
+          <p>
+            Performance and reliability for video delivery across forty thousand device types.
+            Profile-guided and post-link binary optimisation of the rendering framework on living
+            room hardware, which is where the taste for squeezing constrained devices came from.
+          </p>
+        </div>
+      </div>
+
+      <div class="cv-row">
+        <div class="cv-when">2016 &rarr; 2018</div>
+        <div class="cv-what">
+          <h4>Wise</h4>
+          <span class="cv-role">European Expansion Lead</span>
+          <p>
+            Led European Expansion across product, engineering, operations and support, a group of
+            more than a hundred people, and re-architected core payment processing along the way.
+          </p>
+        </div>
+      </div>
+
+      <div class="cv-tail">
+        <div class="cv-when">Before</div>
+        <div>
+          <p>
+            <b>HappyCar</b> staff engineer on early AWS microservices (2014-2015) ·
+            <b>ironSource</b> high-load realtime billing pipelines, among the first AWS Redshift adopters worldwide (2013-2014) ·
+            <b>Sixt / DriveNow</b> backends behind the car-sharing launch across European capitals ·
+            <b>Softheme</b> engineering lead.
+          </p>
+        </div>
+      </div>
+
+      <div class="cv-tail">
+        <div class="cv-when">Foundations</div>
+        <div>
+          <p>
+            <b>Kyiv Polytechnic Institute</b>, MSc and BSc in Computer Science, summa cum laude.
+            Computer Systems and Networks, with post-graduate research in cryptanalysis on
+            resilient S-Box construction meeting the Strict Avalanche Criterion.
+          </p>
+        </div>
+      </div>
+
+      <div class="cv-tail">
+        <div class="cv-when">Tools</div>
+        <div>
+          <p>
+            Python - mother tongue · Java - father tongue · Go (it grows on you) ·
+            TypeScript (regretfully) · Lua (when possible) · C++ · Rust (when going deep) ·
+            terrible C on bare metal (when the occasion calls for it) ·
+            ASM (for occasions that never call)<br>
+            Stateful stream processing, distributed tracing, fleet-wide continuous profiling,
+            performance engineering from datacentre scale all the way down to a microcontroller
+            with 8 MB of RAM.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ CONTACT ═══ -->
+<section id="contact" class="contact">
+  <div class="container">
+    <p class="section-label reveal" style="justify-content:center">Get in touch</p>
+    <h2 class="section-title reveal" style="text-align:center">Let's <em>connect</em></h2>
+    <div class="contact-links reveal">
+      <a class="contact-link" href="https://github.com/Novotarskyi" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" style="fill:currentColor;stroke:none"><path d="M12 .5C5.37.5 0 5.87 0 12.5c0 5.3 3.44 9.8 8.21 11.39.6.11.82-.26.82-.58 0-.29-.01-1.05-.02-2.06-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.73.08-.73 1.21.09 1.84 1.24 1.84 1.24 1.07 1.84 2.81 1.31 3.5 1 .11-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.12-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 016 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.66.24 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.61-2.81 5.63-5.49 5.93.43.37.81 1.1.81 2.22 0 1.6-.01 2.89-.01 3.29 0 .32.22.7.83.58A12.01 12.01 0 0024 12.5C24 5.87 18.63.5 12 .5z"/></svg>
+        Novotarskyi
+      </a>
+      <a class="contact-link" href="https://linkedin.com/in/kyrylo-novotarskyi" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24"><path d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-4 0v7h-4v-7a6 6 0 016-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
+        LinkedIn
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ DONATE ═══ -->
+<section id="donate" class="donate">
+  <div class="container">
+    <p class="section-label reveal" style="justify-content:center"><span class="ua-flag" aria-hidden="true"></span>Donate to Ukraine&rsquo;s defenders</p>
+    <div class="donate-row reveal">
+      <a class="donate-btn" data-c="savelife" href="https://savelife.in.ua/en/donate-en/" rel="noopener" target="_blank">Come Back Alive Foundation</a>
+      <a class="donate-btn" data-c="prytula" href="https://prytulafoundation.org/en/donation" rel="noopener" target="_blank">Serhiy Prytula Charity Foundation</a>
+      <a class="donate-btn" data-c="hospitallers" href="https://www.hospitallers.life/needs-hospitallers" rel="noopener" target="_blank">The Hospitallers Battalion</a>
+      <a class="donate-btn" data-c="u24" href="https://u24.gov.ua/" rel="noopener" target="_blank">UNITED 24</a>
+    </div>
+    <p class="donate-direct reveal">
+      or <a data-c="trust" href="https://monzo.me/Novotarskyi" rel="noopener" target="_blank">place your trust
+      in me directly</a> by donating in support of the Ukrainian Medical Corps with best-in-class
+      hemostatic agents, procured at manufacturing source and shipped straight to the front line
+      hotspots where the need is most critical.<br>
+      <span class="donate-fifty">$50 saves a life - literally.</span><br>
+      <span class="donate-ledger">$150,000+ deployed, 2250+ Celox Haemostatics delivered so far.</span><br>
+      <span class="donate-ledger"><a data-c="nomenclature" href="https://docs.google.com/spreadsheets/d/11mWVBJDrpQaJfEoERbiEmESVg5paxcoPQ7fkLouUGLo/edit?gid=0#gid=0"
+         rel="noopener" target="_blank">Full nomenclature is and always will be publicly available here</a></span>
+    </p>
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <p>
+      <span class="served">Proudly served from a shelf in London</span><br>
+      © 2026 Kyrylo Novotarskyi
+    </p>
+  </div>
+</footer>
+
+<script>
+  /* the conversion ledger: a click on any data-c link beacons its slug to the
+     fleet itself (POST /c) - counted on-shelf, no third party in the loop */
+  document.getElementById('donate').addEventListener('click', function (e) {
+    var a = e.target.closest ? e.target.closest('a[data-c]') : null;
+    if (a && navigator.sendBeacon) navigator.sendBeacon('/c?k=' + a.getAttribute('data-c'));
+  });
+
+(function(){
+  "use strict";
+
+  /* ── bake mode: the rada's screenshot pass ── */
+  if (new URLSearchParams(location.search).has('bake')) {
+    document.documentElement.classList.add('baked');
+    document.querySelectorAll('.reveal').forEach(function(el){ el.classList.add('visible'); });
+  }
+
+  /* ── scroll reveals ── */
+  var obs = new IntersectionObserver(function(entries){
+    entries.forEach(function(entry, i){
+      if(entry.isIntersecting){
+        setTimeout(function(){ entry.target.classList.add('visible'); }, i * 70);
+        obs.unobserve(entry.target);
+      }
+    });
+  }, { threshold:0.1, rootMargin:'0px 0px -40px 0px' });
+  document.querySelectorAll('.reveal').forEach(function(el){ obs.observe(el); });
+
+  /* ── live fleet ──
+     Polls /roster on the same origin that served this page. The swarm publishes it
+     as JSON. If this copy is being read from anywhere other than the swarm itself
+     (an archive, a mirror, a local file) the fetch simply fails and the panel says so. */
+  var $ = function(id){ return document.getElementById(id); };
+
+  function shortName(n){ return String(n || ''); }
+
+  function fmtUptime(s){
+    s = Number(s) || 0;
+    if(s < 60)    return s + 's';
+    if(s < 3600)  return Math.floor(s / 60) + 'm';
+    if(s < 86400) return Math.floor(s / 3600) + 'h';
+    return Math.floor(s / 86400) + 'd';
+  }
+
+  /* rssi in dBm to a rough 0..1 quality, -30 excellent, -85 barely there */
+  function rssiQuality(dbm){
+    var q = (Number(dbm) + 85) / 55;
+    return Math.max(0.05, Math.min(1, q));
+  }
+
+  function roleClass(role){
+    if(role === 'otaman') return 'role-otaman';
+    if(role === 'pysar' || role === 'kobzar') return 'role-pysar';
+    return 'role-kozak';
+  }
+
+  /* Has the roster EVER answered? If it has, this page is being served by the
+     swarm and a failed poll means a blade is busy or the mask is moving - not
+     that you are reading a copy. Those two cases deserve very different words,
+     and only one of them should clear the table. */
+  var everLive = false, missed = 0;
+
+  /* A poll failed. Keep every number on screen: they were true a few seconds ago
+     and they will be true again shortly. Wiping the table on a failed fetch made
+     a 4-second mask handover look like the fleet had collapsed - which is the
+     opposite of what a failover is meant to demonstrate. */
+  function setStale(){
+    missed++;
+    $('f-pulse').classList.add('warn');
+    $('f-status').style.color = 'var(--warn)';
+    $('f-status-text').textContent = 'connection lost · reconnecting every 3s' +
+      (missed > 1 ? ' (' + missed + ' missed)' : '');
+  }
+
+  /* Genuinely not the swarm: no roster has ever answered, so this is a copy. */
+  function setOffline(){
+    if(everLive){ setStale(); return; }
+    $('f-pulse').classList.add('off');
+    $('f-status-text').textContent = 'not reachable from here';
+    $('f-status').style.color = 'var(--text-muted)';
+    $('f-body').innerHTML =
+      '<tr><td colspan="7" style="color:var(--text-muted);line-height:1.8">' +
+      'The live roster is only visible when this page is served by the swarm itself. ' +
+      'You are most likely reading a copy.</td></tr>';
+    ['m-backends','f-quorum','f-backends','f-avail','f-req','f-served','f-refused','f-killed',
+     'f-idle','f-conn','f-ttfb','f-lat','f-p95'].forEach(function(id){ $(id).textContent = '·'; });
+    $('m-backends').className = 'hero-meta-value';   /* no green dot on a copy */
+  }
+
+  function render(d){
+    var members = Array.isArray(d.members) ? d.members.slice() : [];
+    if(!members.length){ setOffline(); return; }
+    members.sort(function(a,b){ return (a.id || 0) - (b.id || 0); });
+
+    var leaderName = shortName(d.leader);
+    /* the balancer's ledger, published by whichever blade answered us */
+    var lb = d.lb || {};
+    var alive = 0, lossSum = 0, lossN = 0, rows = '';
+    /* every request a backend answered passed through the balancer */
+    /* which node ids the balancer has benched (bit N = id N) */
+    var benched = function(id){ return ((lb.benched || 0) >> (id & 7)) & 1; };
+    var backendReqTotal = members.reduce(function(t, m){
+      var isL = shortName(m.name) === leaderName;
+      return t + ((!isL && m.eligible && m.req_count) ? m.req_count : 0);
+    }, 0);
+
+    members.forEach(function(m){
+      var isAlive = !!m.self || m.state === 'alive';
+      /* the leader reports its role in `state`; peers carry a dedicated `role` */
+      var role    = m.role || m.state || '';
+      var nm      = shortName(m.name);
+      var isLead  = nm === leaderName;
+      if(isAlive) alive++;
+      if(!m.self && isAlive && typeof m.loss === 'number'){ lossSum += m.loss; lossN++; }
+
+      /* A node cannot hear its own radio. Before the balancer that node was
+         simply "self"; now it is the backend the otaman routed YOU to, which is
+         a far more interesting thing to say. */
+      var linkCell = '<span style="color:var(--alive)">serving you</span>';
+      if(!m.self){
+        var q = rssiQuality(m.rssi);
+        linkCell = '<span class="bar"><i style="width:' + Math.round(q * 100) + '%"></i></span>' +
+                   (Number(m.rssi) || 0) + ' dBm';
+      }
+
+      /* What this member is DOING, not merely what it is called. The otaman no
+         longer serves pages: it holds the mask and splices every connection out
+         to a kozak, so "load balancing" is the honest word for it. */
+      var status = '<span style="color:var(--text-muted)">·</span>';
+      if(!isAlive){
+        status = '<span style="color:var(--lost)">lost</span>';
+      } else if(isLead){
+        /* SOLO: the otaman normally never serves - it holds the mask and hands
+           every connection to a kozak. With no backend left it splices to its
+           own server instead, because serving slowly beats serving nothing.
+           Saying just "load balancing" while it is also the thing being balanced
+           to reads like a contradiction, so name it. */
+        var solo = (lb.backends === 1 && m.self);
+        status = solo
+          ? '<span style="color:var(--warn)">load balancing · solo</span>'
+          : '<span style="color:var(--lime)">load balancing</span>';
+      } else if(m.eligible && benched(m.id)){
+        /* The blade still gossips serving=1 - a wedged server has no idea it is
+           wedged. The balancer has MEASURED otherwise, and its measurement wins:
+           saying "serving" here would be the fleet repeating a corpse's own
+           opinion of itself. */
+        status = '<span style="color:var(--lost)">unreachable</span>';
+      } else if(m.eligible && m.serving !== 0){
+        status = '<span style="color:var(--alive)">serving</span>';
+      } else if(!m.eligible){
+        status = '<span style="color:var(--text-muted)">watching</span>';
+      } else {
+        status = '<span style="color:var(--warn)">standing by</span>';
+      }
+
+      /* Served, in ONE unit: requests. A kozak reports what its TLS server
+         answered. The otaman cannot count requests at all - it works at layer 4
+         and never sees a request boundary - but every request a backend served
+         travelled through it, so the sum IS its honest total. Its own ledger
+         counts CONNECTIONS, which is a smaller number for a good reason: one
+         keep-alive connection carries the page, the favicon, the og image and
+         every roster poll after it. */
+      /* observers never serve anything, so a hard 0 would read as a fault
+         rather than as "not this node's job" */
+      var servedN = isLead ? backendReqTotal
+                   : (!m.eligible ? null
+                   : (m.req_count != null ? m.req_count : null));
+      var servedCell = servedN == null ? '<span style="color:var(--text-muted)">·</span>'
+                                       : servedN.toLocaleString();
+
+      /* die temperature, tinted by the recorder's own norms (vitals.h):
+         green below 60, amber from 60, red from 70. null means the blade
+         never said - a dot, not a zero. */
+      var tempCell = '<span style="color:var(--text-muted)">·</span>';
+      if (m.temp_c != null) {
+        var tC = Number(m.temp_c);
+        var tCol = tC >= 70 ? 'var(--lost)' : tC >= 60 ? 'var(--warn)' : 'var(--alive)';
+        tempCell = '<span style="color:' + tCol + '">' + tC.toFixed(1) + '&thinsp;&deg;C</span>';
+      }
+
+      rows += '<tr' + (isLead ? ' class="is-leader"' : '') + '>' +
+        '<td><span class="node-dot' + (isAlive ? '' : ' lost') + '"></span>' +
+            '<span class="node-name">' + nm + '</span></td>' +
+        '<td><span class="role-tag ' + roleClass(role) + '">' + role + '</span></td>' +
+        '<td>' + status + '</td>' +
+        '<td>' + linkCell + '</td>' +
+        '<td>' + servedCell + '</td>' +
+        '<td>' + tempCell + '</td>' +
+        '<td>' + fmtUptime(m.uptime_s) + '</td>' +
+      '</tr>';
+    });
+
+    $('f-body').innerHTML = rows;
+    everLive = true; missed = 0;
+    $('f-pulse').classList.remove('off');
+    $('f-pulse').classList.remove('warn');
+    $('f-status').style.color = 'var(--alive)';
+    $('f-status-text').textContent = 'live · polling every 3s';
+
+    /* the node wearing the mask is the one actually answering requests */
+    var lead = members.filter(function(m){ return shortName(m.name) === leaderName; })[0] || {};
+    var swarmLoss = lossN ? Math.round(lossSum / lossN) : 0;
+
+    var num = function(v){ return v == null ? '·' : Number(v).toLocaleString(); };
+    var ms  = function(v){ return v == null ? '·' : Math.round(Number(v)) + ' ms'; };
+
+    $('f-quorum').textContent   = alive + ' / ' + members.length;
+    /* Everything below describes the OTAMAN acting as load balancer: what it
+       took in, what it got served, and what it turned away. Before the balancer
+       these were one blade's own httpd counters. */
+    /* usable, not merely present - with a benched blade the old count kept
+       insisting on 3 while the fleet could only reach 2 */
+    $('f-backends').textContent = lb.backends == null ? '·'
+      : (lb.known != null && lb.known > lb.backends
+           ? lb.backends + ' of ' + lb.known
+           : String(lb.backends));
+    $('f-req').textContent      = num(lb.accepted);
+    $('f-served').textContent   = num(lb.done);
+    $('f-refused').textContent  = num(lb.refused);
+    $('f-killed').textContent   = num(lb.killed);
+    $('f-idle').textContent     = num(lb.idle_kills);
+    $('f-conn').textContent     = ms(lb.conn_ms);
+    $('f-ttfb').textContent     = ms(lb.first_ms);
+    if (lead.avail_x10 != null) {
+      var av = lead.avail_x10 / 10;
+      $('f-avail').textContent = (av >= 100 ? '100' : av.toFixed(1)) + '%';
+      $('f-avail').className   = 'fleet-stat-value' + (lead.avail_x10 >= 999 ? ' live' : '');
+    } else {
+      $('f-avail').textContent = '·';
+    }
+    /* RESPONSE TIME comes from the blades, not the balancer. The splicer works
+       below HTTP: it can time a connection but never a request, and a keep-alive
+       connection is mostly a visitor sitting still. Each kozak times its own
+       requests and reports its percentiles; we average the serving ones, which
+       is fair while they are evenly loaded - and least-connections is what keeps
+       them that way. */
+    var lat = members.filter(function(m){
+      return m.eligible && shortName(m.name) !== leaderName &&
+             (m.self || m.state === 'alive') && m.p50_lat_us;
+    });
+    var avg = function(key){
+      if(!lat.length) return null;
+      return lat.reduce(function(t, m){ return t + (m[key] || 0); }, 0) / lat.length / 1000;
+    };
+    var p50 = avg('p50_lat_us'), p95 = avg('p95_lat_us');
+    $('f-lat').textContent = p50 == null ? '·' : (Math.round(p50 * 10) / 10) + ' ms';
+    $('f-p95').textContent = p95 == null ? '·' : (Math.round(p95 * 10) / 10) + ' ms';
+
+    $('m-nodes').textContent  = members.filter(function(m){ return m.eligible; }).length || members.length;
+    $('m-observers').textContent = members.filter(function(m){ return !m.eligible; }).length || 2;
+    $('m-leader').textContent = leaderName || 'otaman';
+    /* The blade that holds the address is not the blade that answers you, so the
+       hero says how many ARE answering. Solo is its own word: one backend that is
+       the leader's own loopback is the degradation ladder's bottom rung, not a
+       three-blade fleet with two missing. */
+    var soloNow = (lb.backends === 1 && lb.known != null && lb.known <= 1);
+    $('m-backends').textContent = lb.backends == null ? '·'
+      : (soloNow ? 'itself' : lb.backends + (lb.backends === 1 ? ' blade' : ' blades'));
+    $('m-backends').className = 'hero-meta-value' + (lb.backends ? ' live' : '');
+    $('m-loss').textContent   = swarmLoss + '%';
+    $('m-loss').className     = 'hero-meta-value' + (swarmLoss < 5 ? ' live' : '');
+  }
+
+  function poll(){
+    /* Give up after 2.5s rather than letting a stalled fetch pile up behind the
+       next tick. AbortController is everywhere we care about; without it a fleet
+       mid-handover collects one pending request per 3 seconds. */
+    var ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    var killer = ctl ? setTimeout(function(){ ctl.abort(); }, 2500) : 0;
+    fetch('/roster', { cache:'no-store', signal: ctl ? ctl.signal : undefined })
+      .then(function(r){ if(!r.ok) throw new Error('http ' + r.status); return r.json(); })
+      .then(function(d){ clearTimeout(killer); render(d); })
+      .catch(function(){ clearTimeout(killer); setOffline(); });
+  }
+
+  /* Poll only while someone is actually looking. A backgrounded tab used to keep
+   * asking every 5s forever; on a 240 MHz server that serves ~1 req/s, a handful of
+   * parked tabs would eat the whole budget and starve real visitors. Hidden tab or
+   * live panels off-screen -> we stop entirely, and refresh the moment you come back. */
+  var POLL_MS = 3000, lastPoll = 0;
+
+  /* Geometry is checked on the tick rather than cached from an observer: a tab that
+   * loads in the background reports nothing intersecting, and no further callback
+   * ever arrives to correct it - which would leave the panel dead forever. */
+  function onScreen(){
+    return ['.hero-meta', '#fleet'].some(function(sel){
+      var el = document.querySelector(sel);
+      if (!el) return false;
+      var r = el.getBoundingClientRect();
+      return r.bottom > -120 && r.top < (window.innerHeight || 0) + 120;
+    });
+  }
+
+  function maybePoll(){
+    if (document.visibilityState !== 'visible' || !onScreen()) return;
+    lastPoll = Date.now();
+    poll();
+  }
+
+  poll();                         /* first paint, regardless of where you land */
+  setInterval(maybePoll, POLL_MS);
+  document.addEventListener('visibilitychange', function(){
+    /* back from a background tab: the numbers on screen are stale, refresh at once */
+    if (document.visibilityState === 'visible' && Date.now() - lastPoll > POLL_MS) maybePoll();
+  });
+})();
+</script>
+</body>
+</html>

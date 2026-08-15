@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 720 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Request path through the balanced fleet. A browser opens one TCP connection on port 443 to the mask, a single static address and virtual MAC held by whichever blade is currently the elected otaman. The otaman is a layer 4 TCP splicer: it relays raw bytes, never decrypts and never parses HTTP, chooses a backend by least connections with round-robin on ties. Three kozak blades each terminate TLS themselves on a LAN-only port and serve the page from flash, so the single TLS session runs from the browser all the way to the kozak. A strip along the bottom shows all four blades gossiping over encrypted ESP-NOW radio at one hertz, building the roster of blades that are alive, serving and holding an address, from which the splicer rebuilds its backend set every second."><rect x="0.0" y="0.0" width="720.0" height="400.0" fill="#0a0a0c"/>
+        <defs>
+          <marker id="balArrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto" markerUnits="strokeWidth">
+            <path d="M0 0 L7 3.5 L0 7 Z" fill="#c4f04d"/>
+          </marker>
+        </defs>
+        <g font-family="ui-monospace,SFMono-Regular,Menlo,monospace">
+
+          <!-- the single tls session, drawn over the top -->
+          <text x="150" y="15" text-anchor="middle" font-size="10" fill="#e8e6e3">one tls session, browser to kozak</text>
+          <path d="M55 100 L55 24 L508 24 L508 40" fill="none" stroke="#c4f04d" stroke-width="1" stroke-dasharray="4 4" marker-end="url(#balArrow)"/>
+          <circle cx="321" cy="24" r="4" fill="#0e0e12" stroke="#c4f04d" stroke-width="1"/>
+          <path d="M321 29 L321 42" stroke="#4a4850" stroke-width="1" stroke-dasharray="2 4"/>
+
+          <!-- you, a browser -->
+          <rect x="12" y="100" width="86" height="74" rx="3" fill="#16161c" stroke="#2a2a33" stroke-width="1"/>
+          <path d="M12 117 L98 117" stroke="#2a2a33" stroke-width="1"/>
+          <circle cx="24" cy="109" r="2" fill="#4a4850"/>
+          <circle cx="32" cy="109" r="2" fill="#4a4850"/>
+          <circle cx="40" cy="109" r="2" fill="#4a4850"/>
+          <text x="55" y="141" text-anchor="middle" font-size="12" fill="#e8e6e3">you</text>
+          <text x="55" y="157" text-anchor="middle" font-size="9" fill="#7a7880">a browser</text>
+          <text x="55" y="169" text-anchor="middle" font-size="9" fill="#4a4850">tls client</text>
+
+          <!-- browser to the mask -->
+          <text x="110" y="127" text-anchor="middle" font-size="9" fill="#7a7880">tcp</text>
+          <path d="M98 137 L120 137" stroke="#c4f04d" stroke-width="1.5" marker-end="url(#balArrow)"/>
+          <text x="110" y="153" text-anchor="middle" font-size="9" fill="#7a7880">:443</text>
+
+          <!-- the mask -->
+          <rect x="122" y="92" width="92" height="90" rx="3" fill="#16161c" stroke="#c4f04d" stroke-width="1"/>
+          <text x="168" y="112" text-anchor="middle" font-size="11" fill="#c4f04d">the mask</text>
+          <text x="168" y="128" text-anchor="middle" font-size="9" fill="#7a7880">one static ip</text>
+          <text x="168" y="140" text-anchor="middle" font-size="9" fill="#7a7880">one vmac</text>
+          <path d="M132 149 L204 149" stroke="#1e1e25" stroke-width="1"/>
+          <text x="168" y="163" text-anchor="middle" font-size="9" fill="#e8e6e3">the router</text>
+          <text x="168" y="175" text-anchor="middle" font-size="9" fill="#e8e6e3">forwards 80/443</text>
+          <text x="168" y="198" text-anchor="middle" font-size="9" fill="#7a7880">worn by the otaman</text>
+
+          <!-- the mask to the otaman -->
+          <path d="M214 137 L234 137" stroke="#c4f04d" stroke-width="1.5" marker-end="url(#balArrow)"/>
+
+          <!-- the otaman: l4 splicer -->
+          <rect x="236" y="44" width="170" height="200" rx="3" fill="#16161c" stroke="#c4f04d" stroke-width="1.5"/>
+          <text x="321" y="64" text-anchor="middle" font-size="12" fill="#c4f04d">the otaman</text>
+          <text x="321" y="79" text-anchor="middle" font-size="10" fill="#7a7880">layer-4 tcp splicer</text>
+          <path d="M248 88 L394 88" stroke="#1e1e25" stroke-width="1"/>
+          <rect x="246" y="94" width="150" height="52" rx="3" fill="#111115" stroke="#2a2a33" stroke-width="1"/>
+          <text x="321" y="111" text-anchor="middle" font-size="10" fill="#e8e6e3">never decrypts</text>
+          <text x="321" y="125" text-anchor="middle" font-size="10" fill="#e8e6e3">never parses http</text>
+          <text x="321" y="139" text-anchor="middle" font-size="9" fill="#7a7880">raw bytes only</text>
+          <rect x="246" y="154" width="150" height="82" rx="3" fill="#111115" stroke="#2a2a33" stroke-width="1"/>
+          <text x="321" y="170" text-anchor="middle" font-size="10" fill="#e8e6e3">least-connections</text>
+          <text x="321" y="182" text-anchor="middle" font-size="9" fill="#7a7880">round-robin on ties</text>
+          <text x="321" y="198" text-anchor="middle" font-size="9" fill="#e8e6e3">4 in flight per backend</text>
+          <text x="321" y="210" text-anchor="middle" font-size="9" fill="#7a7880">12 relay slots total</text>
+          <text x="321" y="226" text-anchor="middle" font-size="9" fill="#7a7880">past that, it waits</text>
+
+          <!-- splice out to the kozaky -->
+          <path d="M406 137 C 428 137, 428 71, 444 71" fill="none" stroke="#c4f04d" stroke-width="1.5" marker-end="url(#balArrow)"/>
+          <path d="M406 137 L444 137" fill="none" stroke="#c4f04d" stroke-width="1.5" marker-end="url(#balArrow)"/>
+          <path d="M406 137 C 428 137, 428 203, 444 203" fill="none" stroke="#c4f04d" stroke-width="1.5" marker-end="url(#balArrow)"/>
+
+          <!-- kozak 1 -->
+          <rect x="448" y="44" width="120" height="54" rx="3" fill="#16161c" stroke="#43e86a" stroke-width="1"/>
+          <circle cx="464" cy="60" r="4" fill="#43e86a"/>
+          <text x="476" y="64" font-size="11" fill="#e8e6e3">kozak 1</text>
+          <path d="M458 70 L558 70" stroke="#1e1e25" stroke-width="1"/>
+          <text x="458" y="86" font-size="9" fill="#43e86a">tls handshake here</text>
+
+          <!-- kozak 2 -->
+          <rect x="448" y="110" width="120" height="54" rx="3" fill="#16161c" stroke="#43e86a" stroke-width="1"/>
+          <circle cx="464" cy="126" r="4" fill="#43e86a"/>
+          <text x="476" y="130" font-size="11" fill="#e8e6e3">kozak 2</text>
+          <path d="M458 136 L558 136" stroke="#1e1e25" stroke-width="1"/>
+          <text x="458" y="152" font-size="9" fill="#43e86a">tls handshake here</text>
+
+          <!-- kozak 3 -->
+          <rect x="448" y="176" width="120" height="54" rx="3" fill="#16161c" stroke="#43e86a" stroke-width="1"/>
+          <circle cx="464" cy="192" r="4" fill="#43e86a"/>
+          <text x="476" y="196" font-size="11" fill="#e8e6e3">kozak 3</text>
+          <path d="M458 202 L558 202" stroke="#1e1e25" stroke-width="1"/>
+          <text x="458" y="218" font-size="9" fill="#43e86a">tls handshake here</text>
+
+          <!-- the page, in flash -->
+          <path d="M568 71 L606 71" stroke="#c4f04d" stroke-width="1.5" marker-end="url(#balArrow)"/>
+          <path d="M568 137 L606 137" stroke="#c4f04d" stroke-width="1.5" marker-end="url(#balArrow)"/>
+          <path d="M568 203 L606 203" stroke="#c4f04d" stroke-width="1.5" marker-end="url(#balArrow)"/>
+          <rect x="608" y="58" width="100" height="26" rx="3" fill="#111115" stroke="#2a2a33" stroke-width="1"/>
+          <text x="658" y="74" text-anchor="middle" font-size="9" fill="#7a7880">page in flash</text>
+          <rect x="608" y="124" width="100" height="26" rx="3" fill="#111115" stroke="#2a2a33" stroke-width="1"/>
+          <text x="658" y="140" text-anchor="middle" font-size="9" fill="#7a7880">page in flash</text>
+          <rect x="608" y="190" width="100" height="26" rx="3" fill="#111115" stroke="#2a2a33" stroke-width="1"/>
+          <text x="658" y="206" text-anchor="middle" font-size="9" fill="#7a7880">page in flash</text>
+
+          <!-- what the roster feeds the splicer -->
+          <text x="314" y="268" text-anchor="end" font-size="9" fill="#c4f04d">usable backends</text>
+          <path d="M321 292 L321 250" fill="none" stroke="#c4f04d" stroke-width="1" stroke-dasharray="4 4" marker-end="url(#balArrow)"/>
+
+          <!-- the radio gossip strip -->
+          <rect x="12" y="272" width="694" height="116" rx="3" fill="#111115" stroke="#1e1e25" stroke-width="1"/>
+          <text x="26" y="300" font-size="10" fill="#c4f04d">the radio gossip</text>
+          <text x="26" y="320" font-size="9" fill="#7a7880">esp-now</text>
+          <text x="26" y="332" font-size="9" fill="#7a7880">encrypted</text>
+          <text x="26" y="344" font-size="9" fill="#7a7880">1 hz</text>
+          <text x="26" y="356" font-size="9" fill="#4a4850">not on the wire</text>
+
+          <rect x="176" y="292" width="286" height="50" rx="3" fill="#16161c" stroke="#2a2a33" stroke-width="1"/>
+          <text x="319" y="309" text-anchor="middle" font-size="10" fill="#e8e6e3">the backend set</text>
+          <text x="319" y="323" text-anchor="middle" font-size="9" fill="#7a7880">alive · serving · holding an address</text>
+          <text x="319" y="337" text-anchor="middle" font-size="9" fill="#7a7880">rebuilt once a second</text>
+
+          <path d="M208 356 L208 342" stroke="#2a2a33" stroke-width="1" stroke-dasharray="2 4"/>
+          <path d="M282 356 L282 342" stroke="#2a2a33" stroke-width="1" stroke-dasharray="2 4"/>
+          <path d="M356 356 L356 342" stroke="#2a2a33" stroke-width="1" stroke-dasharray="2 4"/>
+          <path d="M430 356 L430 342" stroke="#2a2a33" stroke-width="1" stroke-dasharray="2 4"/>
+          <path d="M240 367 L250 367" stroke="#2a2a33" stroke-width="1" stroke-dasharray="2 4"/>
+          <path d="M314 367 L324 367" stroke="#2a2a33" stroke-width="1" stroke-dasharray="2 4"/>
+          <path d="M388 367 L398 367" stroke="#2a2a33" stroke-width="1" stroke-dasharray="2 4"/>
+
+          <rect x="176" y="356" width="64" height="22" rx="3" fill="#16161c" stroke="#c4f04d" stroke-width="1"/>
+          <circle cx="188" cy="367" r="3" fill="#c4f04d"/>
+          <text x="198" y="370" font-size="9" fill="#c4f04d">otaman</text>
+          <rect x="250" y="356" width="64" height="22" rx="3" fill="#16161c" stroke="#2a2a33" stroke-width="1"/>
+          <circle cx="262" cy="367" r="3" fill="#43e86a"/>
+          <text x="272" y="370" font-size="9" fill="#e8e6e3">kozak 1</text>
+          <rect x="324" y="356" width="64" height="22" rx="3" fill="#16161c" stroke="#2a2a33" stroke-width="1"/>
+          <circle cx="336" cy="367" r="3" fill="#43e86a"/>
+          <text x="346" y="370" font-size="9" fill="#e8e6e3">kozak 2</text>
+          <rect x="398" y="356" width="64" height="22" rx="3" fill="#16161c" stroke="#2a2a33" stroke-width="1"/>
+          <circle cx="410" cy="367" r="3" fill="#43e86a"/>
+          <text x="420" y="370" font-size="9" fill="#e8e6e3">kozak 3</text>
+
+          <text x="490" y="302" font-size="10" fill="#c4f04d">real-time backend discovery</text>
+          <text x="490" y="322" font-size="9" fill="#7a7880">the splicer keeps no list of</text>
+          <text x="490" y="334" font-size="9" fill="#7a7880">backends in config. it learns</text>
+          <text x="490" y="346" font-size="9" fill="#7a7880">them from the radio, and drops</text>
+          <text x="490" y="358" font-size="9" fill="#7a7880">any blade that goes quiet for</text>
+          <text x="490" y="370" font-size="9" fill="#7a7880">three seconds.</text>
+
+        </g>
+      </svg>

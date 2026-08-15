@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 720 460" xmlns="http://www.w3.org/2000/svg" width="100%" role="img" aria-label="Four stacked panels showing a fleet of four ESP32 serving blades degrading one blade at a time. Panel one, healthy: blade b1 is the otaman, wears the mask on port 443 and splices raw TCP to three kozaky, b2, b3 and b4, each terminating TLS on a LAN-only port. Panel two: b1 is lost and drawn dashed with a red dot, b2 has won the election, wears the mask and balances to two backends; a blade is declared lost 3 seconds after its last heartbeat. Panel three: b1 and b2 are both lost, b3 wears the mask and balances to the single survivor b4. Panel four, solo: b1, b2 and b3 are lost, b4 wears the mask and splices to its own server over loopback, the last line of defence."><rect x="0.0" y="0.0" width="720.0" height="460.0" fill="#0a0a0c"/>
+      <g font-family="ui-monospace,SFMono-Regular,Menlo,monospace">
+      <defs>
+      <marker id="ladderArrow" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 z" fill="#c4f04d"/></marker>
+      </defs>
+
+      <rect x="0" y="0" width="720" height="460" fill="#0e0e12"/>
+
+      <text x="20" y="17" font-size="12" fill="#e8e6e3">failover ladder</text>
+      <text x="138" y="17" font-size="9" fill="#7a7880">four states, one blade lost at a time</text>
+      <text x="700" y="17" font-size="9" fill="#7a7880" text-anchor="end">the mask: one vmac + one ip, the only forwarded address</text>
+
+      <!-- ============ state 1 : healthy ============ -->
+      <rect x="10" y="28" width="700" height="95" rx="3" fill="#111115" stroke="#1e1e25"/>
+      <text x="22" y="48" font-size="12" fill="#c4f04d">1</text>
+      <text x="38" y="48" font-size="11" fill="#e8e6e3">healthy</text>
+      <text x="22" y="64" font-size="9" fill="#7a7880">one otaman splices,</text>
+      <text x="22" y="75" font-size="9" fill="#7a7880">three kozaky serve.</text>
+      <text x="22" y="86" font-size="9" fill="#7a7880">least-connections,</text>
+      <text x="22" y="97" font-size="9" fill="#7a7880">round-robin on ties.</text>
+
+      <circle cx="186" cy="46" r="3" fill="#c4f04d"/>
+      <path d="M186,46 H239 V55" fill="none" stroke="#c4f04d" stroke-width="1.5" marker-end="url(#ladderArrow)"/>
+      <text x="239" y="40" font-size="9" fill="#c4f04d" text-anchor="middle">the mask</text>
+
+      <rect x="186" y="58" width="106" height="36" rx="3" fill="#16161c" stroke="#c4f04d" stroke-width="1.5"/>
+      <circle cx="199" cy="70" r="4" fill="#c4f04d"/>
+      <text x="210" y="74" font-size="11" fill="#c4f04d">otaman</text>
+      <text x="282" y="74" font-size="9" fill="#4a4850" text-anchor="end">b1</text>
+      <text x="196" y="87" font-size="9" fill="#7a7880">splices :443</text>
+
+      <rect x="322" y="58" width="106" height="36" rx="3" fill="#16161c" stroke="#2a2a33"/>
+      <circle cx="335" cy="70" r="4" fill="#43e86a"/>
+      <text x="346" y="74" font-size="11" fill="#e8e6e3">kozak</text>
+      <text x="418" y="74" font-size="9" fill="#4a4850" text-anchor="end">b2</text>
+      <text x="332" y="87" font-size="9" fill="#7a7880">serves tls</text>
+
+      <rect x="458" y="58" width="106" height="36" rx="3" fill="#16161c" stroke="#2a2a33"/>
+      <circle cx="471" cy="70" r="4" fill="#43e86a"/>
+      <text x="482" y="74" font-size="11" fill="#e8e6e3">kozak</text>
+      <text x="554" y="74" font-size="9" fill="#4a4850" text-anchor="end">b3</text>
+      <text x="468" y="87" font-size="9" fill="#7a7880">serves tls</text>
+
+      <rect x="594" y="58" width="106" height="36" rx="3" fill="#16161c" stroke="#2a2a33"/>
+      <circle cx="607" cy="70" r="4" fill="#43e86a"/>
+      <text x="618" y="74" font-size="11" fill="#e8e6e3">kozak</text>
+      <text x="690" y="74" font-size="9" fill="#4a4850" text-anchor="end">b4</text>
+      <text x="604" y="87" font-size="9" fill="#7a7880">serves tls</text>
+
+      <path d="M239,94 V107 H647" fill="none" stroke="#c4f04d" stroke-width="1"/>
+      <path d="M375,107 V97" fill="none" stroke="#c4f04d" stroke-width="1" marker-end="url(#ladderArrow)"/>
+      <path d="M511,107 V97" fill="none" stroke="#c4f04d" stroke-width="1" marker-end="url(#ladderArrow)"/>
+      <path d="M647,107 V97" fill="none" stroke="#c4f04d" stroke-width="1" marker-end="url(#ladderArrow)"/>
+      <text x="443" y="117" font-size="9" fill="#7a7880" text-anchor="middle">the otaman relays raw bytes</text>
+
+      <!-- ============ state 2 : otaman lost ============ -->
+      <rect x="10" y="131" width="700" height="95" rx="3" fill="#111115" stroke="#1e1e25"/>
+      <text x="22" y="151" font-size="12" fill="#c4f04d">2</text>
+      <text x="38" y="151" font-size="11" fill="#e8e6e3">otaman lost</text>
+      <text x="22" y="167" font-size="9" fill="#7a7880">b1 stops beating.</text>
+      <text x="22" y="178" font-size="9" fill="#7a7880">b2 wins the election</text>
+      <text x="22" y="189" font-size="9" fill="#7a7880">and takes the mask.</text>
+      <text x="22" y="200" font-size="9" fill="#ff5555">declared lost after 3 s</text>
+
+      <circle cx="186" cy="149" r="3" fill="#c4f04d"/>
+      <path d="M186,149 H375 V158" fill="none" stroke="#c4f04d" stroke-width="1.5" marker-end="url(#ladderArrow)"/>
+      <text x="375" y="143" font-size="9" fill="#c4f04d" text-anchor="middle">the mask</text>
+
+      <rect x="186" y="161" width="106" height="36" rx="3" fill="#111115" stroke="#2a2a33" stroke-dasharray="3 3"/>
+      <circle cx="199" cy="173" r="4" fill="#ff5555"/>
+      <text x="210" y="177" font-size="11" fill="#4a4850">lost</text>
+      <text x="282" y="177" font-size="9" fill="#4a4850" text-anchor="end">b1</text>
+      <text x="196" y="190" font-size="9" fill="#4a4850">no heartbeat</text>
+
+      <rect x="322" y="161" width="106" height="36" rx="3" fill="#16161c" stroke="#c4f04d" stroke-width="1.5"/>
+      <circle cx="335" cy="173" r="4" fill="#c4f04d"/>
+      <text x="346" y="177" font-size="11" fill="#c4f04d">otaman</text>
+      <text x="418" y="177" font-size="9" fill="#4a4850" text-anchor="end">b2</text>
+      <text x="332" y="190" font-size="9" fill="#7a7880">splices :443</text>
+
+      <rect x="458" y="161" width="106" height="36" rx="3" fill="#16161c" stroke="#2a2a33"/>
+      <circle cx="471" cy="173" r="4" fill="#43e86a"/>
+      <text x="482" y="177" font-size="11" fill="#e8e6e3">kozak</text>
+      <text x="554" y="177" font-size="9" fill="#4a4850" text-anchor="end">b3</text>
+      <text x="468" y="190" font-size="9" fill="#7a7880">serves tls</text>
+
+      <rect x="594" y="161" width="106" height="36" rx="3" fill="#16161c" stroke="#2a2a33"/>
+      <circle cx="607" cy="173" r="4" fill="#43e86a"/>
+      <text x="618" y="177" font-size="11" fill="#e8e6e3">kozak</text>
+      <text x="690" y="177" font-size="9" fill="#4a4850" text-anchor="end">b4</text>
+      <text x="604" y="190" font-size="9" fill="#7a7880">serves tls</text>
+
+      <path d="M375,197 V210 H647" fill="none" stroke="#c4f04d" stroke-width="1"/>
+      <path d="M511,210 V200" fill="none" stroke="#c4f04d" stroke-width="1" marker-end="url(#ladderArrow)"/>
+      <path d="M647,210 V200" fill="none" stroke="#c4f04d" stroke-width="1" marker-end="url(#ladderArrow)"/>
+      <text x="700" y="221" font-size="9" fill="#7a7880" text-anchor="end">relays in flight die with it. the next request lands on b2</text>
+
+      <!-- ============ state 3 : and again ============ -->
+      <rect x="10" y="234" width="700" height="95" rx="3" fill="#111115" stroke="#1e1e25"/>
+      <text x="22" y="254" font-size="12" fill="#c4f04d">3</text>
+      <text x="38" y="254" font-size="11" fill="#e8e6e3">and again</text>
+      <text x="22" y="270" font-size="9" fill="#7a7880">b2 goes too. b3 wins</text>
+      <text x="22" y="281" font-size="9" fill="#7a7880">and wears the mask.</text>
+      <text x="22" y="292" font-size="9" fill="#7a7880">one backend left.</text>
+
+      <circle cx="186" cy="252" r="3" fill="#c4f04d"/>
+      <path d="M186,252 H511 V261" fill="none" stroke="#c4f04d" stroke-width="1.5" marker-end="url(#ladderArrow)"/>
+      <text x="511" y="246" font-size="9" fill="#c4f04d" text-anchor="middle">the mask</text>
+
+      <rect x="186" y="264" width="106" height="36" rx="3" fill="#111115" stroke="#2a2a33" stroke-dasharray="3 3"/>
+      <circle cx="199" cy="276" r="4" fill="#ff5555"/>
+      <text x="210" y="280" font-size="11" fill="#4a4850">lost</text>
+      <text x="282" y="280" font-size="9" fill="#4a4850" text-anchor="end">b1</text>
+      <text x="196" y="293" font-size="9" fill="#4a4850">no heartbeat</text>
+
+      <rect x="322" y="264" width="106" height="36" rx="3" fill="#111115" stroke="#2a2a33" stroke-dasharray="3 3"/>
+      <circle cx="335" cy="276" r="4" fill="#ff5555"/>
+      <text x="346" y="280" font-size="11" fill="#4a4850">lost</text>
+      <text x="418" y="280" font-size="9" fill="#4a4850" text-anchor="end">b2</text>
+      <text x="332" y="293" font-size="9" fill="#4a4850">no heartbeat</text>
+
+      <rect x="458" y="264" width="106" height="36" rx="3" fill="#16161c" stroke="#c4f04d" stroke-width="1.5"/>
+      <circle cx="471" cy="276" r="4" fill="#c4f04d"/>
+      <text x="482" y="280" font-size="11" fill="#c4f04d">otaman</text>
+      <text x="554" y="280" font-size="9" fill="#4a4850" text-anchor="end">b3</text>
+      <text x="468" y="293" font-size="9" fill="#7a7880">splices :443</text>
+
+      <rect x="594" y="264" width="106" height="36" rx="3" fill="#16161c" stroke="#2a2a33"/>
+      <circle cx="607" cy="276" r="4" fill="#43e86a"/>
+      <text x="618" y="280" font-size="11" fill="#e8e6e3">kozak</text>
+      <text x="690" y="280" font-size="9" fill="#4a4850" text-anchor="end">b4</text>
+      <text x="604" y="293" font-size="9" fill="#7a7880">serves tls</text>
+
+      <path d="M511,300 V313 H647" fill="none" stroke="#c4f04d" stroke-width="1"/>
+      <path d="M647,313 V303" fill="none" stroke="#c4f04d" stroke-width="1" marker-end="url(#ladderArrow)"/>
+      <text x="700" y="324" font-size="9" fill="#7a7880" text-anchor="end">roles swap by election</text>
+
+      <!-- ============ state 4 : solo ============ -->
+      <rect x="10" y="337" width="700" height="95" rx="3" fill="#111115" stroke="#1e1e25"/>
+      <text x="22" y="357" font-size="12" fill="#c4f04d">4</text>
+      <text x="38" y="357" font-size="11" fill="#e8e6e3">solo</text>
+      <text x="22" y="373" font-size="9" fill="#7a7880">b4 wears the mask and</text>
+      <text x="22" y="384" font-size="9" fill="#7a7880">splices to its own</text>
+      <text x="22" y="395" font-size="9" fill="#7a7880">server over loopback.</text>
+      <text x="22" y="406" font-size="9" fill="#7a7880">nobody left to balance.</text>
+      <text x="22" y="417" font-size="9" fill="#c4f04d">the last line of defence</text>
+
+      <circle cx="186" cy="355" r="3" fill="#c4f04d"/>
+      <path d="M186,355 H647 V364" fill="none" stroke="#c4f04d" stroke-width="1.5" marker-end="url(#ladderArrow)"/>
+      <text x="647" y="349" font-size="9" fill="#c4f04d" text-anchor="middle">the mask</text>
+
+      <rect x="186" y="367" width="106" height="36" rx="3" fill="#111115" stroke="#2a2a33" stroke-dasharray="3 3"/>
+      <circle cx="199" cy="379" r="4" fill="#ff5555"/>
+      <text x="210" y="383" font-size="11" fill="#4a4850">lost</text>
+      <text x="282" y="383" font-size="9" fill="#4a4850" text-anchor="end">b1</text>
+      <text x="196" y="396" font-size="9" fill="#4a4850">no heartbeat</text>
+
+      <rect x="322" y="367" width="106" height="36" rx="3" fill="#111115" stroke="#2a2a33" stroke-dasharray="3 3"/>
+      <circle cx="335" cy="379" r="4" fill="#ff5555"/>
+      <text x="346" y="383" font-size="11" fill="#4a4850">lost</text>
+      <text x="418" y="383" font-size="9" fill="#4a4850" text-anchor="end">b2</text>
+      <text x="332" y="396" font-size="9" fill="#4a4850">no heartbeat</text>
+
+      <rect x="458" y="367" width="106" height="36" rx="3" fill="#111115" stroke="#2a2a33" stroke-dasharray="3 3"/>
+      <circle cx="471" cy="379" r="4" fill="#ff5555"/>
+      <text x="482" y="383" font-size="11" fill="#4a4850">lost</text>
+      <text x="554" y="383" font-size="9" fill="#4a4850" text-anchor="end">b3</text>
+      <text x="468" y="396" font-size="9" fill="#4a4850">no heartbeat</text>
+
+      <rect x="594" y="367" width="106" height="36" rx="3" fill="#16161c" stroke="#c4f04d" stroke-width="1.5"/>
+      <circle cx="607" cy="379" r="4" fill="#c4f04d"/>
+      <text x="618" y="383" font-size="11" fill="#c4f04d">solo</text>
+      <text x="690" y="383" font-size="9" fill="#4a4850" text-anchor="end">b4</text>
+      <text x="604" y="396" font-size="9" fill="#7a7880">mask + server</text>
+
+      <path d="M627,403 V416 H667 V406" fill="none" stroke="#c4f04d" stroke-width="1" marker-end="url(#ladderArrow)"/>
+      <text x="560" y="422" font-size="9" fill="#7a7880" text-anchor="end">20 of 20 requests still served</text>
+      <text x="647" y="428" font-size="9" fill="#c4f04d" text-anchor="middle">loopback</text>
+
+      <!-- ============ legend ============ -->
+      <path d="M10,437 H710" stroke="#1e1e25" stroke-width="1"/>
+      <circle cx="24" cy="449" r="4" fill="#c4f04d"/>
+      <text x="34" y="452" font-size="9" fill="#7a7880">otaman - wears the mask</text>
+      <circle cx="196" cy="449" r="4" fill="#43e86a"/>
+      <text x="206" y="452" font-size="9" fill="#7a7880">kozak - serves tls</text>
+      <circle cx="392" cy="449" r="4" fill="#ff5555"/>
+      <text x="402" y="452" font-size="9" fill="#7a7880">lost - silent for 3 s</text>
+      <text x="700" y="452" font-size="9" fill="#7a7880" text-anchor="end">esp-now roster, 1 hz</text>
+      </g>
+      </svg>

@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1320 640" width="1320" height="640">
+<rect width="1320" height="640" fill="#0e1116"/>
+<g font-family="ui-monospace, 'SF Mono', Menlo, monospace">
+<text x="30" y="38" font-size="20" font-weight="bold" fill="#b8e05a" letter-spacing=".04em">THE ONE BLOB - USB-OTG pads on the board's BACK</text>
+<text x="30" y="62" font-size="12.5" fill="#8a93a6">display board face-down: COM top-left, USB bottom-left, ESP32-S3 silk at centre</text>
+
+<!-- board -->
+<rect x="70" y="100" width="760" height="430" rx="10" fill="#14161c" stroke="#3a4150" stroke-width="2"/>
+<!-- top pin row -->
+<text x="100" y="130" font-size="9.5" fill="#8a93a6">GND GND 20  21  47  48  45  0   35  36  37  38  39  40  41 ...</text>
+<g fill="#c9ced8">
+<circle cx="105" cy="150" r="6"/><circle cx="133" cy="150" r="6"/><circle cx="161" cy="150" r="6"/><circle cx="189" cy="150" r="6"/><circle cx="217" cy="150" r="6"/><circle cx="245" cy="150" r="6"/><circle cx="273" cy="150" r="6"/><circle cx="301" cy="150" r="6"/><circle cx="329" cy="150" r="6"/><circle cx="357" cy="150" r="6"/><circle cx="385" cy="150" r="6"/><circle cx="413" cy="150" r="6"/><circle cx="441" cy="150" r="6"/><circle cx="469" cy="150" r="6"/><circle cx="497" cy="150" r="6"/><circle cx="525" cy="150" r="6"/>
+</g>
+<!-- bottom pin row -->
+<g fill="#c9ced8">
+<circle cx="105" cy="480" r="6"/><circle cx="133" cy="480" r="6"/><circle cx="161" cy="480" r="6"/><circle cx="189" cy="480" r="6"/><circle cx="217" cy="480" r="6"/><circle cx="245" cy="480" r="6"/><circle cx="273" cy="480" r="6"/><circle cx="301" cy="480" r="6"/><circle cx="329" cy="480" r="6"/><circle cx="357" cy="480" r="6"/><circle cx="385" cy="480" r="6"/><circle cx="413" cy="480" r="6"/><circle cx="441" cy="480" r="6"/><circle cx="469" cy="480" r="6"/>
+</g>
+<text x="95" y="510" font-size="9.5" fill="#8a93a6">GND 5Vin  13  12  11  10  9   46  3   8   18  17  16 ...</text>
+<text x="133" y="530" font-size="9" fill="#e0524f" text-anchor="middle">&#9650; your red T1 head clips here (5Vin)</text>
+
+<!-- left edge labels -->
+<text x="88" y="205" font-size="12" font-weight="bold" fill="#e8e8f0">COM</text>
+<text x="88" y="415" font-size="12" font-weight="bold" fill="#e8e8f0">USB</text>
+<text x="60" y="240" font-size="9.5" fill="#8a93a6" text-anchor="end">flash</text>
+<text x="60" y="254" font-size="9.5" fill="#8a93a6" text-anchor="end">socket</text>
+<text x="60" y="440" font-size="9.5" fill="#b8e05a" text-anchor="end">POWER</text>
+<text x="60" y="454" font-size="9.5" fill="#b8e05a" text-anchor="end">socket</text>
+<text x="60" y="468" font-size="9.5" fill="#8a93a6" text-anchor="end">(after blob)</text>
+
+<!-- decoy through-holes -->
+<ellipse cx="150" cy="250" rx="8" ry="12" fill="none" stroke="#5a6a7a" stroke-width="2"/>
+<ellipse cx="150" cy="300" rx="8" ry="12" fill="none" stroke="#5a6a7a" stroke-width="2"/>
+<ellipse cx="185" cy="330" rx="8" ry="12" fill="none" stroke="#5a6a7a" stroke-width="2"/>
+<ellipse cx="150" cy="380" rx="8" ry="12" fill="none" stroke="#5a6a7a" stroke-width="2"/>
+<text x="215" y="290" font-size="11" fill="#e0524f">&#10007; NOT these - any OVAL hole</text>
+<text x="215" y="306" font-size="11" fill="#e0524f">pairs are unpopulated parts,</text>
+<text x="215" y="322" font-size="11" fill="#e0524f">never bridge them</text>
+
+<!-- ESP32-S3 silk -->
+<text x="620" y="330" font-size="26" font-weight="bold" fill="#3f4654">ESP32-S3</text>
+
+<!-- THE PADS -->
+<rect x="428" y="398" width="16" height="22" fill="#c9a227" stroke="#0a0a0c" stroke-width="1"/>
+<rect x="450" y="398" width="16" height="22" fill="#c9a227" stroke="#0a0a0c" stroke-width="1"/>
+<text x="447" y="440" font-size="11" font-weight="bold" fill="#e8e8f0" text-anchor="middle">USB-OTG</text>
+<circle cx="447" cy="409" r="46" fill="none" stroke="#b8e05a" stroke-width="3" stroke-dasharray="8 6"/>
+<path d="M 560,250 C 520,300 480,350 458,392" fill="none" stroke="#b8e05a" stroke-width="3"/>
+<path d="M 458,392 L 468,372 M 458,392 L 446,378" stroke="#b8e05a" stroke-width="3" fill="none"/>
+<text x="575" y="240" font-size="14" font-weight="bold" fill="#b8e05a">THESE TWO - the only target:</text>
+<text x="575" y="260" font-size="12" fill="#c9ced8">the flat rectangle pair whose own</text>
+<text x="575" y="276" font-size="12" fill="#c9ced8">silk says USB-OTG, beside the text</text>
+
+<!-- zoom inset -->
+<rect x="880" y="100" width="410 " height="430" rx="10" fill="#111318" stroke="#3a4150" stroke-width="1.5"/>
+<text x="1085" y="132" font-size="13" font-weight="bold" fill="#e8e8f0" text-anchor="middle">ZOOM - before and after</text>
+<text x="985" y="170" font-size="11" fill="#8a93a6" text-anchor="middle">BEFORE: two pads, a gap</text>
+<rect x="930" y="190" width="46" height="64" fill="#c9a227" stroke="#0a0a0c" stroke-width="1.5"/>
+<rect x="994" y="190" width="46" height="64" fill="#c9a227" stroke="#0a0a0c" stroke-width="1.5"/>
+<text x="985" y="282" font-size="10.5" fill="#8a93a6" text-anchor="middle">the gap = the open switch</text>
+<text x="1195" y="170" font-size="11" fill="#b8e05a" text-anchor="middle">AFTER: one blob joins them</text>
+<rect x="1140" y="190" width="46" height="64" fill="#c9a227" stroke="#0a0a0c" stroke-width="1.5"/>
+<rect x="1204" y="190" width="46" height="64" fill="#c9a227" stroke="#0a0a0c" stroke-width="1.5"/>
+<ellipse cx="1195" cy="222" rx="42" ry="26" fill="#c0c0cc" stroke="#8a8894" stroke-width="1.5"/>
+<text x="1195" y="282" font-size="10.5" fill="#b8e05a" text-anchor="middle">shiny, spans both, touches nothing else</text>
+<text x="1085" y="330" font-size="11.5" fill="#c9ced8" text-anchor="middle">move: tinned tip laid ACROSS both pads,</text>
+<text x="1085" y="348" font-size="11.5" fill="#c9ced8" text-anchor="middle">feed ~1mm solder, lift. One second.</text>
+<text x="1085" y="386" font-size="11.5" fill="#e8b04a" text-anchor="middle">board UNPLUGGED, both cables out</text>
+<text x="1085" y="424" font-size="11.5" fill="#4dc46a" text-anchor="middle">verify cold: EACH end of the blob</text>
+<text x="1085" y="442" font-size="11.5" fill="#4dc46a" text-anchor="middle">beeps to the 5Vin pin = bridge live</text>
+<text x="1085" y="480" font-size="11.5" fill="#8a93a6" text-anchor="middle">then power into the USB socket:</text>
+<text x="1085" y="498" font-size="11.5" fill="#e8e8f0" text-anchor="middle">bare 5Vin &#8596; GND = ~4.9-5.1V at last</text>
+
+<text x="660" y="580" font-size="12.5" fill="#e8b04a" text-anchor="middle">landmarks: the pad pair sits between the USB socket edge and the big ESP32-S3 silk, its own text right beside it</text>
+<text x="660" y="604" font-size="12" fill="#8a93a6" text-anchor="middle">if anything at that spot looks different from this drawing - stop and re-check the landmarks before soldering</text>
+</g>
+</svg>

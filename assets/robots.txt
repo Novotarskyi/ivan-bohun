@@ -1,0 +1,12 @@
+# Served from a rack of six microcontrollers in a London flat. The fleet's
+# measured ceiling is about three fresh TLS connections per second - crawl
+# the page; please leave the telemetry alone.
+
+User-agent: *
+Allow: /$
+Allow: /llms.txt
+Disallow: /roster
+Crawl-delay: 10
+
+# /roster is live swarm telemetry, regenerated per request. It has no archival
+# value and polling it takes capacity away from human visitors.

@@ -1,0 +1,32 @@
+CONFIG_IDF_TARGET="esp32s3"
+# Waveshare ESP32-S3-Touch-LCD-4.3B = WROOM-1-N16R8 (16MB flash, 8MB octal PSRAM)
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_SPEED_80M=y
+# ANTI-DRIFT (the RGB panel shifts horizontally when FB DMA starves): run code +
+# rodata from PSRAM so flash-cache traffic never stalls the FB fetch, 64B lines
+CONFIG_SPIRAM_FETCH_INSTRUCTIONS=y
+CONFIG_SPIRAM_RODATA=y
+CONFIG_ESP32S3_DATA_CACHE_64KB=y
+CONFIG_ESP32S3_DATA_CACHE_LINE_64B=y
+CONFIG_COMPILER_OPTIMIZATION_PERF=y
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
+# radio-only in steady state; WiFi exists ONLY inside a touch-opened OTA window (doc 38)
+CONFIG_LWIP_IPV6=n
+# LVGL fonts for the 800x480 mission-control UI
+CONFIG_LV_FONT_MONTSERRAT_16=y
+CONFIG_LV_FONT_MONTSERRAT_20=y
+CONFIG_LV_FONT_MONTSERRAT_28=y
+CONFIG_LV_FONT_UNSCII_16=y
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+# OTA window (doc 38): dual slots + trial-or-rollback, HTTPS door on demand
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
+CONFIG_ESP_HTTPS_SERVER_ENABLE=y
+# TLS sessions allocate from PSRAM: the 800x480 LVGL UI owns internal RAM,
+# and the window's first live handshake died of PSA_ERROR_INSUFFICIENT_MEMORY
+# (-0x008D, 2026-08-13). This is NOT the forbidden MBEDTLS_DYNAMIC_BUFFER -
+# buffers are same-sized, just placed in external RAM. Mission-only: the
+# blades keep TLS in internal RAM for serving speed.
+CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y
