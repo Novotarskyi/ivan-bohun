@@ -13,6 +13,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
+#include <errno.h>
 
 /* Liveness from 32-bit millisecond stamps. Unsigned subtraction survives the
  * 49-day wrap; last_seen == 0 means "never heard at all", not "heard at t=0"
@@ -195,4 +196,87 @@ static inline size_t bohun_json_close_clamped(char *buf, size_t len)
     }
     memcpy(buf + cut + 1, "]}\n", 4);   /* incl. NUL */
     return cut + 3;
+}
+
+/* THE PROBE MUST NOT COMPETE WITH THE WORK. The self-probe is a loopback
+ * connect, and a connect needs a TCP control block from the same pool the
+ * splicer fills on purpose (LWIP_MAX_ACTIVE_TCP stays at 16 as the fleet's
+ * admission control - sdkconfig.defaults has the measurements). A full pool
+ * fails socket()/connect() with ENOBUFS, ENOMEM, ENFILE, EMFILE or EAGAIN:
+ * that is "busy", not "dead", and reading it as dead made a fully loaded
+ * leader stand itself down 21 times in 16 days. Only a refusal or a timeout
+ * is evidence that the listener is gone. */
+typedef enum { BOHUN_PROBE_OK, BOHUN_PROBE_BUSY, BOHUN_PROBE_DEAD } bohun_probe_t;
+
+static inline bohun_probe_t bohun_probe_verdict(bool connected, int err)
+{
+    if (connected) {
+        return BOHUN_PROBE_OK;
+    }
+    switch (err) {
+    case ENOBUFS:
+    case ENOMEM:
+    case ENFILE:
+    case EMFILE:
+    case EAGAIN:
+        return BOHUN_PROBE_BUSY;
+    default:
+        return BOHUN_PROBE_DEAD;
+    }
+}
+
+/* One verdict folded into the failure streak: OK clears it, DEAD grows it,
+ * BUSY leaves it exactly where it was - a probe that could not run neither
+ * confirms nor forgives. Saturates rather than wrapping back to healthy. */
+static inline uint8_t bohun_probe_streak(uint8_t fails, bohun_probe_t v)
+{
+    if (v == BOHUN_PROBE_OK) {
+        return 0;
+    }
+    if (v == BOHUN_PROBE_DEAD) {
+        return fails < 255 ? (uint8_t)(fails + 1) : 255;
+    }
+    return fails;
+}
+
+/* Fit to be elected and handed traffic? Not while the streak is at the sick
+ * threshold, and not for hold_ms after the LAST sick-level failure even once
+ * probes pass again. The election is lowest-id-wins with no stickiness, so
+ * without the hold a recovered leader takes the mask straight back the moment
+ * its pool drains: two handovers, seven seconds apart, for one hiccup.
+ * stood_down_ms == 0 means never stood down; unsigned math survives the wrap. */
+static inline bool bohun_probe_fit(uint8_t fails, uint8_t sick_at,
+                                   uint32_t stood_down_ms, uint32_t now_ms,
+                                   uint32_t hold_ms)
+{
+    if (fails >= sick_at) {
+        return false;
+    }
+    if (stood_down_ms != 0 && (uint32_t)(now_ms - stood_down_ms) < hold_ms) {
+        return false;
+    }
+    return true;
+}
+
+/* Room for the probe? A loopback connect costs two control blocks (the client
+ * side and the accepted side) out of a pool of `pool`, and every relay pair
+ * costs two. When the pairs leave fewer than four behind, the probe either
+ * fails at socket() or takes the last block so the listener cannot accept -
+ * a silent SYN drop that reads as a timeout, i.e. as death. Do not probe at
+ * all then: the pool is full, and full is load. */
+static inline bool bohun_probe_room(uint8_t pairs, uint16_t pool)
+{
+    return (uint16_t)(2u * pairs + 4u) <= pool;
+}
+
+/* A relayed connection whose client has sent nothing since accept is not a
+ * visitor: a browser's ClientHello follows the SYN within one round trip.
+ * Past silent_ms it is a scanner or a half-open probe holding a relay slot
+ * and two control blocks out of the admission-control pool. It is killed,
+ * and the backend is NOT judged for it - it was never asked anything, so
+ * its silence is not evidence. Signed ms stamps, as the splicer keeps them. */
+static inline bool bohun_pair_silent(bool client_spoke, int64_t accept_ms,
+                                     int64_t now_ms, int64_t silent_ms)
+{
+    return !client_spoke && now_ms - accept_ms > silent_ms;
 }

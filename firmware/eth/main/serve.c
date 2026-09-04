@@ -24,6 +24,7 @@
 #include "logic.h"   /* header parsing + policy kernels, host-tested */
 #include "serve.h"
 #include "ota.h"
+#include "splice.h"  /* pairs in flight: the probe must not spend the pool's last blocks */
 
 /* err_kind[] rides mid-heartbeat sized by SERVE_ERR_KINDS; if the IDF ever
  * grows httpd_err_code_t, tally() below would silently drop the new codes.
@@ -120,33 +121,43 @@ static int64_t s_standby_until_us;
 #define PROBE_PERIOD_MS   7000
 #define PROBE_FAIL_SICK   2      /* stop advertising ourselves */
 #define PROBE_FAIL_ABORT  6      /* ~42 s of a dead server: capture and reboot */
-static volatile int s_probe_fails;
+/* Stay stood down this long after the last sick-level failure. The election
+ * has no stickiness, so without it a leader whose pool merely drained takes
+ * the mask straight back: two handovers for one hiccup (bohun_probe_fit). */
+#define PROBE_HOLD_DOWN_MS 60000
+static volatile uint8_t  s_probe_fails;
+static volatile uint32_t s_stood_down_ms;   /* ms stamp of the last sick-level failure, 0 = never */
 static volatile int64_t s_probe_ran_us;
 
-static bool probe_once(uint16_t port)
+/* A connect needs a PCB from the pool the splicer fills on purpose, so a
+ * full node cannot tell "busy" from "dead" by success alone: the errno
+ * decides (bohun_probe_verdict). */
+static bohun_probe_t probe_once(uint16_t port)
 {
     int fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (fd < 0) return false;
+    if (fd < 0) return bohun_probe_verdict(false, errno);
     int fl = fcntl(fd, F_GETFL, 0);
     fcntl(fd, F_SETFL, fl | O_NONBLOCK);
     struct sockaddr_in a = {
         .sin_family = AF_INET, .sin_port = htons(port),
         .sin_addr.s_addr = htonl(INADDR_LOOPBACK),
     };
-    bool ok = false;
+    int err;
     if (connect(fd, (struct sockaddr *)&a, sizeof(a)) == 0) {
-        ok = true;                       /* loopback can complete immediately */
+        err = 0;                         /* loopback can complete immediately */
     } else if (errno == EINPROGRESS) {
         fd_set w; FD_ZERO(&w); FD_SET(fd, &w);
         struct timeval tv = { .tv_sec = 3, .tv_usec = 0 };
+        err = ETIMEDOUT;
         if (select(fd + 1, NULL, &w, NULL, &tv) > 0) {
-            int err = 0; socklen_t el = sizeof(err);
+            socklen_t el = sizeof(err);
             getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &el);
-            ok = (err == 0);
         }
+    } else {
+        err = errno;
     }
     close(fd);
-    return ok;
+    return bohun_probe_verdict(err == 0, err);
 }
 
 static void probe_task(void *arg)
@@ -154,17 +165,29 @@ static void probe_task(void *arg)
     (void)arg;
     vTaskDelay(pdMS_TO_TICKS(20000));    /* let the servers finish coming up */
     for (;;) {
-        bool ok = probe_once(CONFIG_BOHUN_PUBLIC_PORT);
-        s_probe_ran_us = esp_timer_get_time();
-        if (ok) {
-            if (s_probe_fails) {
-                ESP_LOGW(TAG, "self-probe recovered after %d failures", s_probe_fails);
-            }
-            s_probe_fails = 0;
+        bohun_probe_t v;
+        splice_stats_t st;
+        if (splice_stats_get(&st) && !bohun_probe_room(st.busy, CONFIG_LWIP_MAX_ACTIVE_TCP)) {
+            v = BOHUN_PROBE_BUSY;   /* the splicer holds the pool - do not spend two blocks to learn that */
         } else {
-            s_probe_fails++;
+            v = probe_once(CONFIG_BOHUN_PUBLIC_PORT);
+        }
+        s_probe_ran_us = esp_timer_get_time();
+        uint8_t before = s_probe_fails;
+        s_probe_fails = bohun_probe_streak(before, v);
+        if (v == BOHUN_PROBE_OK) {
+            if (before) {
+                ESP_LOGW(TAG, "self-probe recovered after %d failures", before);
+            }
+        } else if (v == BOHUN_PROBE_BUSY) {
+            /* the pool is full: that is load, not death - the streak stands still */
+            ESP_LOGW(TAG, "self-probe could not run: no socket/PCB free (streak stays %d)", before);
+        } else {
             ESP_LOGE(TAG, "SELF-PROBE FAILED (%d): nothing can open :%d on this node",
                      s_probe_fails, CONFIG_BOHUN_PUBLIC_PORT);
+            if (s_probe_fails >= PROBE_FAIL_SICK) {
+                s_stood_down_ms = (uint32_t)(s_probe_ran_us / 1000);
+            }
             if (s_probe_fails == PROBE_FAIL_SICK) {
                 blackbox_event(BBX_ERR5XX, 0, "self-probe: own port dead, standing down");
             }
@@ -618,8 +641,10 @@ bool serve_is_ready(void)
     /* The self-probe overrides the boot latch. A blade whose own port refuses
      * its own loopback has no business being elected or handed traffic, however
      * cleanly it started. This is the line that stops the fleet trusting a
-     * corpse's word for it. */
-    if (s_probe_fails >= PROBE_FAIL_SICK) {
+     * corpse's word for it. Busy is not dead, and a node that stood down stays
+     * down for a hold - both rules are bohun_probe_fit() in logic.h. */
+    if (!bohun_probe_fit(s_probe_fails, PROBE_FAIL_SICK, s_stood_down_ms,
+                         (uint32_t)(esp_timer_get_time() / 1000), PROBE_HOLD_DOWN_MS)) {
         return false;
     }
     return s_ready;

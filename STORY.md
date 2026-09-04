@@ -33,7 +33,7 @@ The project below is the result of figuring out the fun:
 As a result, https://kyrylonovotarskyi.com is served from six ESP32-S3 microcontrollers on a shelf
 in a London flat.
 
-No CDN in front, no Cloud behind, no hosting provider, no Raspberry Pi's, and most definitely no hardware load balancers anywhere in the building. 
+No CDN in front, no Cloud behind, no hosting provider, no Raspberry Pis, and most definitely no hardware load balancers anywhere in the building. 
 The whole rack, screens and fans included, draws about 22 watts.
 The primary fleet serves the website and terminates TLS on 240 MHz chips, load-balances across itself with a bespoke L4 TCP splicer, monitors itself, and heals itself.
 It survives pulling any plug in it, including the leader's, recovering in under four seconds.

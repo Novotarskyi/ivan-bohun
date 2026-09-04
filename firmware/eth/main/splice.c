@@ -34,6 +34,10 @@
  * cost is per-packet tcpip + SPI, not copies. Leave at 2 KB. */
 #define BUF_SZ        2048
 #define IDLE_KILL_MS  30000
+/* A client that has said nothing since accept is not a visitor (bohun_pair_silent):
+ * scanners hoarding slots and PCBs for the full idle window were what filled
+ * the pool under the leader and tripped its self-probe. */
+#define SILENT_KILL_MS 8000
 #define STATS_MS      5000
 #define ROSTER_MS     1000            /* backend table refresh cadence */
 #define FLUSH_MS      500             /* one side gone: how long to push what is still buffered */
@@ -59,6 +63,7 @@ typedef struct {
     uint8_t  backend_id;              /* member id - stable across roster refreshes */
     bool     used;
     bool     connecting;
+    bool     c_spoke;                 /* the client has sent at least one byte */
     int64_t  last_io_ms;
     int64_t  t_accept;
     int64_t  t_conn;                  /* backend connect completed */
@@ -141,7 +146,7 @@ static void set_nodelay(int fd)
     setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
 }
 
-typedef enum { END_DONE, END_ERR, END_REFUSED, END_TIMEOUT } end_t;
+typedef enum { END_DONE, END_ERR, END_REFUSED, END_TIMEOUT, END_SILENT } end_t;
 
 static void safe_close(int *fd)
 {
@@ -190,6 +195,7 @@ static void pair_close(pair_t *p, end_t why)
     case END_ERR:     s_killed++;    break;
     case END_REFUSED: s_refused++;   break;
     case END_TIMEOUT: s_timeouts++;  break;
+    case END_SILENT:  s_timeouts++;  break;   /* the idle bucket; the backend goes unjudged */
     }
 }
 
@@ -489,6 +495,7 @@ static void splice_task(void *arg)
                     p->bfd = b;
                     p->backend_id = s_be[idx].id;
                     p->connecting = true;
+                    p->c_spoke = false;
                     p->used = true;
                     p->last_io_ms = now_ms();
                     p->t_accept = p->last_io_ms;
@@ -536,6 +543,7 @@ static void splice_task(void *arg)
                    && dir_step(&p->b2c, p->bfd, p->cfd,
                                FD_ISSET(p->bfd, &rd), &s_bytes_out);
             if (s_bytes_in != bi || s_bytes_out != bo) p->last_io_ms = t;
+            if (s_bytes_in != bi) p->c_spoke = true;
             if (s_bytes_out != bo && !p->t_first) {
                 p->t_first = t;                       /* backend spoke - bank the setup */
                 int si = (int)(s_ph_setup_n % PHASE_N);
@@ -568,6 +576,8 @@ static void splice_task(void *arg)
                 p->t_half = t;                /* still bytes to push - brief flush window */
             } else if (p->t_half && t - p->t_half > FLUSH_MS) {
                 pair_close(p, END_TIMEOUT);
+            } else if (bohun_pair_silent(p->c_spoke, p->t_accept, t, SILENT_KILL_MS)) {
+                pair_close(p, END_SILENT);
             } else if (t - p->last_io_ms > IDLE_KILL_MS) {
                 pair_close(p, END_TIMEOUT);
             }

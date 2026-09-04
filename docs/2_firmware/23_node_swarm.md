@@ -160,7 +160,11 @@ Its rules:
 - **Least connections, round-robin on ties.**
 - **Hard caps instead of queues**: 12 relay pairs total, 4 in flight per
   backend, listen backlog 8. Past the cap it stops accepting and SYNs park
-  in the backlog; idle pairs are reaped after 30 s.
+  in the backlog. Idle pairs are reaped after 30 s; a pair whose client has
+  said nothing at all since accept is reaped after 8 s, since a browser's
+  ClientHello follows its SYN within a round trip - anything slower is a
+  scanner hoarding a slot and two control blocks, which is what filled the
+  leader's pool and tripped its self-probe.
 - **The backend table is rebuilt every second** from the gossip roster -
   alive, serving, holding an address. No configuration file names a backend.
 - **The circuit breaker judges by measured outcomes only.** The heartbeat's

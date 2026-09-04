@@ -115,11 +115,29 @@ picked, so it cannot identify a blade.
 Every 7 s the blade makes a non-blocking loopback TCP connect to its own
 backend port, with a hard deadline so the probe cannot hang.
 
-- **Two consecutive failures**: the blade reports itself not-serving, leaves
+The connect draws a TCP control block from the same pool the splicer fills on
+purpose, so the probe reads its own errno rather than trusting success alone:
+a full pool (`ENOBUFS`/`ENOMEM`/`ENFILE`/`EMFILE`/`EAGAIN`) is **busy**, a
+refusal or timeout is **dead**. Only *dead* counts. A leader carrying its full
+load would otherwise stand itself down for being popular - which is exactly
+what it did, 21 times over 16 days, until this rule went in.
+
+- **Two consecutive dead probes**: the blade reports itself not-serving, leaves
   the election, and every splicer benches it within about 2 s.
-- **Six failures** (about 42 s of a dead server): a deliberate `abort()`, so
+- **Busy probes are not failures**: the streak stands still while the pool is
+  full, so load can never masquerade as death.
+- **No probe while the splicer holds the pool**: with seven or more relay pairs
+  in flight the probe is skipped outright, because a connect would take the
+  last control block and the listener's silent SYN drop would read as a
+  timeout - death by another name.
+- **Six dead probes** (about 42 s of a dead server): a deliberate `abort()`, so
   the coredump names the task the server was stuck in, then reboot.
 - Any success clears the count.
+- **A 60 s hold-down after standing down**: a blade that just left the election
+  stays out for a minute even once probes pass again. The election is
+  lowest-id-wins with no stickiness, so without the hold a leader whose pool
+  merely drained would reclaim the mask seconds later - two handovers for one
+  hiccup.
 
 `POST /standby` drives the same not-ready path on demand - the standard way
 to rehearse a failover without pulling a plug. The probe is one half of the

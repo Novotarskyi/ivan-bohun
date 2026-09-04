@@ -314,6 +314,67 @@ static void test_json_repair_no_object_refuses(void)
     TEST_ASSERT_EQUAL_size_t(0, bohun_json_close_clamped(b, 8));
 }
 
+/* ---- self-probe --------------------------------------------------------- */
+
+static void test_probe_verdict_busy_is_not_dead(void)
+{
+    TEST_ASSERT_EQUAL(BOHUN_PROBE_OK, bohun_probe_verdict(true, 0));
+    TEST_ASSERT_EQUAL(BOHUN_PROBE_BUSY, bohun_probe_verdict(false, ENOBUFS));
+    TEST_ASSERT_EQUAL(BOHUN_PROBE_BUSY, bohun_probe_verdict(false, ENOMEM));
+    TEST_ASSERT_EQUAL(BOHUN_PROBE_BUSY, bohun_probe_verdict(false, ENFILE));
+    TEST_ASSERT_EQUAL(BOHUN_PROBE_BUSY, bohun_probe_verdict(false, EMFILE));
+    TEST_ASSERT_EQUAL(BOHUN_PROBE_BUSY, bohun_probe_verdict(false, EAGAIN));
+    TEST_ASSERT_EQUAL(BOHUN_PROBE_DEAD, bohun_probe_verdict(false, ECONNREFUSED));
+    TEST_ASSERT_EQUAL(BOHUN_PROBE_DEAD, bohun_probe_verdict(false, ETIMEDOUT));
+}
+
+static void test_probe_streak_busy_holds_dead_grows_ok_clears(void)
+{
+    uint8_t f = 0;
+    f = bohun_probe_streak(f, BOHUN_PROBE_DEAD);
+    TEST_ASSERT_EQUAL_UINT8(1, f);
+    f = bohun_probe_streak(f, BOHUN_PROBE_BUSY);   /* a full pool is not a verdict */
+    TEST_ASSERT_EQUAL_UINT8(1, f);
+    f = bohun_probe_streak(f, BOHUN_PROBE_DEAD);
+    TEST_ASSERT_EQUAL_UINT8(2, f);
+    f = bohun_probe_streak(f, BOHUN_PROBE_OK);
+    TEST_ASSERT_EQUAL_UINT8(0, f);
+    TEST_ASSERT_EQUAL_UINT8(255, bohun_probe_streak(255, BOHUN_PROBE_DEAD));
+}
+
+static void test_probe_fit_hold_down_after_stand_down(void)
+{
+    TEST_ASSERT_TRUE(bohun_probe_fit(0, 2, 0, 100000, 60000));       /* never stood down */
+    TEST_ASSERT_TRUE(bohun_probe_fit(1, 2, 0, 100000, 60000));       /* one blip is not sick */
+    TEST_ASSERT_FALSE(bohun_probe_fit(2, 2, 100000, 100000, 60000)); /* sick right now */
+    /* recovered 7 s after standing down - the old flap - still held */
+    TEST_ASSERT_FALSE(bohun_probe_fit(0, 2, 100000, 107000, 60000));
+    TEST_ASSERT_FALSE(bohun_probe_fit(0, 2, 100000, 159999, 60000));
+    TEST_ASSERT_TRUE(bohun_probe_fit(0, 2, 100000, 160000, 60000));  /* the hold is up */
+}
+
+static void test_probe_fit_survives_49_day_wrap(void)
+{
+    uint32_t stood = 0xFFFFF000u;
+    TEST_ASSERT_FALSE(bohun_probe_fit(0, 2, stood, 0x00000100u, 60000)); /* 4.3 s later, through the wrap */
+    TEST_ASSERT_TRUE(bohun_probe_fit(0, 2, stood, 0x0000F000u, 60000));  /* 65.5 s later */
+}
+
+static void test_probe_room_leaves_two_blocks_spare(void)
+{
+    TEST_ASSERT_TRUE(bohun_probe_room(0, 16));
+    TEST_ASSERT_TRUE(bohun_probe_room(6, 16));    /* 12 + the probe's 2 + 2 spare */
+    TEST_ASSERT_FALSE(bohun_probe_room(7, 16));   /* 14: the probe would take the last block */
+    TEST_ASSERT_FALSE(bohun_probe_room(8, 16));   /* 16: socket() itself fails */
+}
+
+static void test_pair_silent_client_never_spoke(void)
+{
+    TEST_ASSERT_FALSE(bohun_pair_silent(false, 1000, 8999, 8000));  /* still inside the window */
+    TEST_ASSERT_TRUE(bohun_pair_silent(false, 1000, 9001, 8000));   /* a scanner holding a slot */
+    TEST_ASSERT_FALSE(bohun_pair_silent(true, 1000, 999999, 8000)); /* it spoke: the idle rule owns it */
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -356,5 +417,11 @@ int main(void)
     RUN_TEST(test_json_repair_boundary_refuses);
     RUN_TEST(test_json_repair_boundary_exact_fit);
     RUN_TEST(test_json_repair_no_object_refuses);
+    RUN_TEST(test_probe_verdict_busy_is_not_dead);
+    RUN_TEST(test_probe_streak_busy_holds_dead_grows_ok_clears);
+    RUN_TEST(test_probe_fit_hold_down_after_stand_down);
+    RUN_TEST(test_probe_fit_survives_49_day_wrap);
+    RUN_TEST(test_probe_room_leaves_two_blocks_spare);
+    RUN_TEST(test_pair_silent_client_never_spoke);
     return UNITY_END();
 }
