@@ -13,6 +13,7 @@ No cloud. No CDN. No Raspberry Pi. No reverse-proxy box.
 [![ESP-IDF](https://img.shields.io/badge/ESP--IDF-v6.0.2-4d7de0?style=flat-square)](https://docs.espressif.com/projects/esp-idf/)
 [![Boards](https://img.shields.io/badge/ESP32--S3-%C3%976-a05de0?style=flat-square)](#hardware)
 [![License](https://img.shields.io/badge/license-MIT-c4f04d?style=flat-square)](LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/Novotarskyi/ivan-bohun/ci.yml?branch=main&style=flat-square&label=ci)](https://github.com/Novotarskyi/ivan-bohun/actions/workflows/ci.yml)
 
 </div>
 

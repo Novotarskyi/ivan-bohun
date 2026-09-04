@@ -1,0 +1,66 @@
+# CI - the host test suite and all three firmware builds, on every push and PR.
+#
+# Runs inside Espressif's official image at the exact ESP-IDF version the fleet
+# is built with, so a green build here is the same toolchain that ships. A clean
+# clone lacks everything .gitignore keeps private (secrets.h, the TLS cert pair,
+# the baked page encodings), so each job fabricates throwaway stand-ins the same
+# way a new contributor would - tools/gen_secrets.sh and the regen commands the
+# CMake guards print. Nothing built here is flashable to the real fleet: the
+# secrets are minted per run and discarded with the runner.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  host-tests:
+    name: host tests (logic.h kernels, ASan+UBSan)
+    runs-on: ubuntu-latest
+    container:
+      image: espressif/idf:v6.0.2
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: run tools/run_tests.sh
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          tools/run_tests.sh
+
+  firmware:
+    name: build ${{ matrix.variant }}
+    runs-on: ubuntu-latest
+    container:
+      image: espressif/idf:v6.0.2
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: eth (lilygo)
+            dir: firmware/eth
+            args: -B build.lilygo -D SDKCONFIG=build.lilygo/sdkconfig -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;boards/lilygo.defaults"
+          - variant: display
+            dir: firmware/display
+            args: ""
+          - variant: mission
+            dir: firmware/mission
+            args: ""
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: fabricate what a clean clone lacks (throwaway, never flashable)
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          apt-get update -qq && apt-get install -y -qq brotli openssl > /dev/null
+          tools/gen_secrets.sh
+          mkdir -p firmware/eth/main/certs
+          openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes \
+            -days 1 -subj "/CN=ci-throwaway" \
+            -keyout firmware/eth/main/certs/prvtkey.pem \
+            -out firmware/eth/main/certs/servercert.pem
+          gzip -9 -n -c assets/personal.html > firmware/eth/main/personal.html.gz
+          brotli -f -q 11 assets/personal.html -o firmware/eth/main/personal.html.br
+      - name: idf.py build
+        working-directory: ${{ matrix.dir }}
+        run: |
+          . "$IDF_PATH/export.sh" > /dev/null
+          idf.py ${{ matrix.args }} build

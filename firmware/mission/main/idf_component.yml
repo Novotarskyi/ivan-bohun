@@ -1,3 +1,11 @@
+# Exact pins, transitives included (dependencies.lock is gitignored, so the
+# manifest is the only place a clean clone can be held to the same versions).
 dependencies:
-  esp_lvgl_port: "^2"
-  espressif/esp_lcd_touch_gt911: "^1"
+  espressif/esp_lvgl_port:
+    version: "==2.8.0~1"
+  espressif/esp_lcd_touch_gt911:
+    version: "==1.2.0~2"
+  espressif/esp_lcd_touch:
+    version: "==1.2.1"
+  lvgl/lvgl:
+    version: "==9.5.0"
