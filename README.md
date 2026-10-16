@@ -110,7 +110,7 @@ The rules the fleet lives by - who leads, what availability means, when
 the balancer benches a blade - are pure functions in one header,
 [`logic.h`](firmware/eth/main/logic.h), proven on the host by
 [`tools/run_tests.sh`](tools/run_tests.sh) with ESP-IDF's own Unity
-(51 tests, ASan/UBSan). The serving path proves itself on the machine
+(57 tests, ASan/UBSan). The serving path proves itself on the machine
 instead: a fresh image must survive a 90-second public serving trial or
 the bootloader rolls it back. Module-by-module detail:
 [`docs/2_firmware/`](docs/2_firmware/).
@@ -178,7 +178,7 @@ Then, in order:
    ```bash
    tools/run_tests.sh
    ```
-   39 checks over the fleet's decision rules (election, availability, the
+   57 checks over the fleet's decision rules (election, availability, the
    balancer's bench), compiled against ESP-IDF's Unity with sanitizers on.
    Run them again after any change to `firmware/eth/main/logic.h`.
 
