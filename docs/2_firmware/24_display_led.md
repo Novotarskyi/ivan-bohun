@@ -40,8 +40,10 @@ radio threshold, so the glass cannot quietly freeze on stale state.
 The screen is a stack of monospace recolor labels, sized so the identity and
 totals read big and only the dense table is small:
 
-- **Head** (16 px): IVAN BOHUN, the pysar's own name, and this image's
-  firmware version - every glass names the exact image it runs.
+- **Head** (16 px): IVAN BOHUN and the pysar's own name. This image's
+  firmware version and build date sit under it on their own 8 px line
+  (shrunk in v11 to give the node table the height) - every glass names
+  the exact image it runs.
 - **Radio-loss line** (8 px): the pysar's own heartbeat loss percentage,
   colored by severity.
 - **The roster** (8 px): the mask's address and vMAC, then one row per

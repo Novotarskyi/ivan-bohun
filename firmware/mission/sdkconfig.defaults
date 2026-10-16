@@ -15,6 +15,13 @@ CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
 # radio-only in steady state; WiFi exists ONLY inside a touch-opened OTA window (doc 38)
 CONFIG_LWIP_IPV6=n
 # LVGL fonts for the 800x480 mission-control UI
+# 2026-10-16 (mission v12): LVGL allocates from the system heap, not its own
+# 64 KB pool. v11 outgrew the pool on the second refresh and LVGL's default
+# assert handler is while(1) - the kobzar froze with the radio still beating.
+# With CLIB malloc the whole heap (PSRAM included) is the ceiling, and a failed
+# assertion now aborts (main/lv_assert_hook.h) instead of halting in silence.
+CONFIG_LV_USE_CLIB_MALLOC=y
+CONFIG_LV_ASSERT_HANDLER_INCLUDE="lv_assert_hook.h"
 CONFIG_LV_FONT_MONTSERRAT_16=y
 CONFIG_LV_FONT_MONTSERRAT_20=y
 CONFIG_LV_FONT_MONTSERRAT_28=y

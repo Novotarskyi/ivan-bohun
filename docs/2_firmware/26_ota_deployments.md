@@ -157,7 +157,6 @@ update story.
 hold 4 s -> read the address off the glass
 tools/deploy_observer.sh display <ip>          # app -> pysar
 tools/deploy_observer.sh mission <ip>          # app -> kobzar
-tools/deploy_observer.sh mission <ip> --page   # page strip -> kobzar
 ```
 
 No fleet gates - a window push touches one observer, and the boot trial is

@@ -19,13 +19,7 @@ idf_component_register(
     EMBED_FILES "arms_84x104.bin"
     EMBED_TXTFILES "../../eth/main/certs/servercert.pem" "../../eth/main/certs/prvtkey.pem"
 )
-# page_strip.bin = the WHOLE served page baked to RGB565 (render_page_asset.py, which
-# also generates page_strip.h). It lives in the dedicated "page" partition - NOT in the
-# app image - so SPIRAM_RODATA doesn't drag 6MB into PSRAM and starve the frame buffers.
-# idf.py flash writes it via the registration below; regenerate after personal.html edits.
-# The .bin is generated and never committed: build works without it, flash needs it.
-if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/page_strip.bin")
-    message(WARNING "page_strip.bin missing - run firmware/mission/render_page_asset.py before idf.py flash (the page tile shows 'partition empty' until then)")
-endif()
-esptool_py_flash_to_partition(flash "page" "${CMAKE_CURRENT_SOURCE_DIR}/page_strip.bin")
+# The "page" partition (a 12 MB RGB565 strip of the served page, for a tile
+# retired in v12) stays in partitions.csv - a table change does not travel over
+# OTA - but nothing is flashed into it any more.
 # arms_84x104.bin = Herb Viyska Zaporozkoho baked small (render_arms_asset.py) - tiny, rides rodata

@@ -10,7 +10,8 @@
 
 The page you are reading lives in flash memory, brotli-compressed, behind a
 TLS 1.3 handshake that terminates on a 240 MHz microcontroller. There is no
-origin server, no CDN, no external fonts, scripts or trackers. The whole
+origin server, no CDN, no external fonts. The one third-party script is a
+Meta pixel for the Facebook page. The whole
 machine - four blades, two screens, a switch, three fans - draws about 22
 watts.
 

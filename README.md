@@ -110,7 +110,7 @@ The rules the fleet lives by - who leads, what availability means, when
 the balancer benches a blade - are pure functions in one header,
 [`logic.h`](firmware/eth/main/logic.h), proven on the host by
 [`tools/run_tests.sh`](tools/run_tests.sh) with ESP-IDF's own Unity
-(39 tests, ASan/UBSan). The serving path proves itself on the machine
+(51 tests, ASan/UBSan). The serving path proves itself on the machine
 instead: a fresh image must survive a 90-second public serving trial or
 the bootloader rolls it back. Module-by-module detail:
 [`docs/2_firmware/`](docs/2_firmware/).
@@ -195,10 +195,7 @@ Then, in order:
    with a different TLS stack shape.
 
 7. **Displays, if you built them** - plain `idf.py build flash` in
-   `firmware/display` and `firmware/mission`. The kobzar additionally
-   flashes a baked image of the site into its page partition; regenerate it
-   after site changes with `firmware/mission/render_page_asset.py` (needs
-   Chrome, nothing else). Later display releases go over the air: hold the
+   `firmware/display` and `firmware/mission`. Later display releases go over the air: hold the
    touch surface for 4 s to open the OTA window, then
    `tools/deploy_observer.sh`
    ([`docs/2_firmware/26_ota_deployments.md`](docs/2_firmware/26_ota_deployments.md)).

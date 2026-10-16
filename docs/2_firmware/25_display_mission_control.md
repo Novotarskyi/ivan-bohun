@@ -53,12 +53,11 @@ Build and flash:
 ```
 cd firmware/mission
 idf.py build                      # single board - root sdkconfig
-idf.py -p /dev/cu.usbmodemXXXX flash monitor    # first flash: app AND page strip, over USB
+idf.py -p /dev/cu.usbmodemXXXX flash monitor    # first flash, over USB
 ```
 
 After the first USB flash, app releases travel through the OTA window
-(`tools/deploy_observer.sh mission <ip>`), and the page strip through the
-same window with `--page`. A version bump follows the fleet rule
+(`tools/deploy_observer.sh mission <ip>`). A version bump follows the fleet rule
 ([`20_firmware.md`](20_firmware.md), variants).
 
 First-light triage, should the panel misbehave: colours inverted or shifted
@@ -88,43 +87,21 @@ mean the data-pin order; dead touch means the GT911 is at its backup address
    row-per-error-code refusal table (the heartbeat's per-code tallies drop
    straight in; the name table is `_Static_assert`-pinned to the error-kind
    count), with the fleet 200-OK total in the corner.
-3. **CONVERSIONS.** Counters for the page's outbound links, per blade and
+3. **REFUSALS.** The ledger's counts in time: the kobzar differences the
+   fleet's refusal counters heartbeat by heartbeat (`logic.h`'s rate ring,
+   host-tested) into a bar per minute for the last hour - amber for theirs
+   (4xx), red for ours (5xx) - with the live per-minute rate, the hour's
+   peak and total, and the fleet's refusals by kind as proportional bars.
+   A counter that runs backwards (a reboot, `POST /reset`) reads as a fresh
+   start, never as a negative rate.
+4. **CONVERSIONS.** Counters for the page's outbound links, per blade and
    fleet-wide.
-4. **THE RADIO.** The gossip tail: every heartbeat heard in the last ~45 s,
+5. **THE RADIO.** The gossip tail: every heartbeat heard in the last ~45 s,
    newest first, with sender, RSSI and sequence-gap markers - the radio's
    own health, visible.
-5. **The served page.** The site itself, baked to RGB565 and memory-mapped
-   from the page partition, vertically scrollable. The tall image lives in
-   its own inner viewport: the viewport owns vertical scrolling while the
-   tileview keeps horizontal swipes, and scroll chaining is off so a drag on
-   the page never leaks into tile navigation (parenting a ~7500 px image
-   straight to the tile would make the tileview itself that tall, and the
-   two scrolls fight).
-
-## Baking the page strip
-
-`render_page_asset.py` renders `assets/personal.html` with headless Chrome at
-a 1280 px CSS viewport scaled by 0.625 - a desktop reflow, emitted exactly
-800 px wide - decodes the PNG in pure Python, trims the empty tail, and
-writes `main/page_strip.bin` (little-endian RGB565) plus `page_strip.h` (the
-height constant). The height is capped so the strip always fits the page
-partition; the desktop viewport exists because a narrow mobile reflow makes
-the strip taller than the partition allows.
-
-The strip deliberately lives in a **dedicated data partition**, outside the
-app image: embedded in rodata it would ride along on every app OTA and, with
-`SPIRAM_RODATA`, drag megabytes into PSRAM that the frame buffers need.
-`idf.py flash` writes it over USB; over the air it goes through the window:
-
-```
-tools/deploy_observer.sh mission <ip> --page
-```
-
-`/page` writes the partition directly and asks for a restart instead of
-rebooting by itself - an interrupted strip write is re-pushed, and the strip
-can never brick a boot. Regenerate and re-push after any change to the served
-page. (`render_arms_asset.py` likewise bakes the small coat-of-arms bitmap
-that rides in rodata.)
+(A sixth tile once showed the served page itself, memory-mapped from a 12 MB
+RGB565 strip in its own partition. Retired in v12; the partition stays in the
+table because a table change does not travel over OTA.)
 
 ## Touch
 

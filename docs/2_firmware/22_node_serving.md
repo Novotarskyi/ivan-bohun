@@ -68,6 +68,7 @@ picked, so it cannot identify a blade.
 | | `GET /blackbox` | the flight recorder, newest first |
 | | `GET /coredump` | raw panic core, for `espcoredump.py` |
 | | `GET /cpu` | per-core idle, per-task CPU share and stack headroom |
+| | `GET /refusals` | the refusal sampler: the last 32 refused requests with peer, listener, status, request line and Host - RAM only, newest first. On the mask holder the `:80` peers are the internet itself; peers on the public TLS port are the splicer |
 | 80 | `*` | 301 to https; host allowlist and private-literal echo only |
 
 ## TLS server

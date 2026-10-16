@@ -1,7 +1,9 @@
 /* bohun: the swarm on glass.
  * ST7789 240x320 over SPI, LVGL via esp_lvgl_port. THREE recolor labels stacked
  * by Y so the header and footer read BIG and only the dense data is small:
- *   s_head - unscii_16 (16px): IVAN BOHUN / Pysar / vN-date  (big)
+ *   s_head - unscii_16 (16px): IVAN BOHUN / Pysar  (big)
+ *   s_ver  - unscii_8: vN-date, its own small line under the head - the
+ *            version line shrank in v11 to give the node rows the height
  *   s_loss - unscii_8: Loss ESP-NOW %, its own small line under the head
  *   s_rows - unscii_8  (8px) : the per-node table, columns lined up (small)
  *   s_foot - unscii_16 (16px): quorum / req / avg rssi / served%        (big)
@@ -54,7 +56,8 @@ static const char *TAG = "bohun_tft";
 #define COL_WARN  "ffb020"
 #define DIVIDER   "------------------------"   /* 24 dashes, fits the 8px row */
 
-static lv_obj_t *s_head;   /* unscii_16 identity + version line */
+static lv_obj_t *s_head;   /* unscii_16 identity */
+static lv_obj_t *s_ver;    /* unscii_8 version-date line under it */
 static lv_obj_t *s_loss;   /* unscii_8: the radio-loss line (16px could not hold it) */
 static char s_ver_line[48];   /* "vN-YYYY.MM.DD" (app-desc version is a 32-byte field) */
 static lv_obj_t *s_rows;   /* unscii_8  vMAC + node table */
@@ -206,11 +209,19 @@ void tft_init(void)
         snprintf(s_ver_line, sizeof(s_ver_line), "v%.10s-%04u.%02u.%02u",
                  ad->version, (unsigned)y % 10000, (unsigned)mo % 100, (unsigned)d % 100);
     }
+    s_ver = lv_label_create(scr);
+    lv_label_set_recolor(s_ver, true);
+    lv_label_set_long_mode(s_ver, LV_LABEL_LONG_CLIP);
+    lv_obj_set_style_text_font(s_ver, &lv_font_unscii_8, 0);
+    lv_obj_set_style_text_color(s_ver, lv_color_hex(0xffffff), 0);
+    lv_obj_set_pos(s_ver, 4, 42);
+    lv_obj_set_width(s_ver, LCD_H_RES - 6);
+    lv_label_set_text(s_ver, "");
     s_loss = lv_label_create(scr);
     lv_label_set_recolor(s_loss, true);
     lv_obj_set_style_text_font(s_loss, &lv_font_unscii_8, 0);
     lv_obj_set_style_text_color(s_loss, lv_color_hex(0xffffff), 0);
-    lv_obj_set_pos(s_loss, 4, 64);
+    lv_obj_set_pos(s_loss, 4, 56);
     lv_obj_set_width(s_loss, LCD_H_RES - 6);
     lv_label_set_text(s_loss, "");
 
@@ -220,7 +231,7 @@ void tft_init(void)
     lv_obj_set_style_text_font(s_rows, &lv_font_unscii_8, 0);
     lv_obj_set_style_text_color(s_rows, lv_color_hex(0xffffff), 0);
     lv_obj_set_style_text_line_space(s_rows, 3, 0);
-    lv_obj_set_pos(s_rows, 4, 78);
+    lv_obj_set_pos(s_rows, 4, 70);
     lv_obj_set_width(s_rows, LCD_H_RES - 6);
     lv_label_set_text(s_rows, "");
 
@@ -415,6 +426,8 @@ void tft_render(const swarm_snap_entry_t *src, int n, uint8_t leader_id)
         }
         lvgl_port_lock(0);
         lv_label_set_text(s_head, hb);
+        lv_label_set_text(s_ver, "");    /* the banner needs the lines under the head */
+        lv_label_set_text(s_loss, "");
         lvgl_port_unlock();
     }
 
@@ -422,13 +435,15 @@ void tft_render(const swarm_snap_entry_t *src, int n, uint8_t leader_id)
     char h[320];
     int hp = 0;
     hp += snprintf(h + hp, sizeof(h) - hp, "#%s IVAN BOHUN#\n", COL_LIME);
-    hp += snprintf(h + hp, sizeof(h) - hp, "#%s Pysar#\n", COL_DIM);
-    hp += snprintf(h + hp, sizeof(h) - hp, "#%s %s#", COL_LIME, s_ver_line);
+    hp += snprintf(h + hp, sizeof(h) - hp, "#%s Pysar#", COL_DIM);
+    char verln[64];
+    snprintf(verln, sizeof(verln), "#%s %s#", COL_LIME, s_ver_line);
     char lossln[48];
     snprintf(lossln, sizeof(lossln), "Loss ESP-NOW: #%s %d%%#", lcol, swarm_loss);
     if (ow == OTAW_IDLE) {
         lvgl_port_lock(0);
         lv_label_set_text(s_head, h);
+        lv_label_set_text(s_ver, verln);
         lv_label_set_text(s_loss, lossln);
         lvgl_port_unlock();
     }

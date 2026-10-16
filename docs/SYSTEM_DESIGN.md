@@ -195,9 +195,9 @@ addresses - the admin variant on 8443 adds them), and both observers.
   tap-to-blank, and a touch-held OTA window.
 - **Kobzar (4.3")**: five tiles - mission control (status and served columns,
   fleet-wide traffic chart, chronicle with the reboot coroner, reign records),
-  THE LEDGER (per-blade HTTP-200s above the refusal table), CONVERSIONS,
-  THE RADIO (the gossip tail, 45 s window, seq-gap markers), and the served
-  page itself, baked to RGB565 at build time.
+  THE LEDGER (per-blade HTTP-200s above the refusal table), REFUSALS (the last
+  hour by the minute, the fleet's refusals by kind, ours against theirs), CONVERSIONS,
+  and THE RADIO (the gossip tail, 45 s window, seq-gap markers).
 - **LED rail** (6x SK6812 RGBW, one pixel per member, one global brightness
   cap): lost red, booting amber fast-blink, release amber slow-blink, benched
   amber solid, balancing deep green, serving faint white, pysar deepest blue,

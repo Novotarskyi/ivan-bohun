@@ -5,12 +5,14 @@
  *            fleet availability, reign records, RELEASE progress on rows.
  *   tile 1 - THE LEDGER: per-blade HTTP 200 counts above the refusal table,
  *            fleet 200-OK total in the corner.
- *   tile 2 - CONVERSIONS: the click table per blade, fleet sum, and the
+ *   tile 2 - REFUSALS: the hour by the minute (bars, theirs and ours), the
+ *            fleet's refusals by kind as bars, the live per-minute rate.
+ *   tile 3 - CONVERSIONS: the click table per blade, fleet sum, and the
  *            kobzar's own NVS archive of what wiped blades forgot.
- *   tile 3 - THE RADIO: the gossip tail, every heartbeat heard in the last
+ *   tile 4 - THE RADIO: the gossip tail, every heartbeat heard in the last
  *            45 s with rssi, seq and missed-frame markers.
- *   tile 4 - "what the world sees": the served page baked to RGB565 at build
- *            time (render_page_asset.py).
+ * (A sixth tile rendered the served page itself from a 12 MB RGB565 strip in
+ *  its own partition; retired in v12 - the partition stays in the table.)
  * Footer tap blanks the backlight (CH422G on/off); any touch wakes.
  * Longest mask reign persists in NVS - the hall of fame survives reboots.
  * NOTE: LVGL's Montserrat builds carry ASCII only - no U+00B7 middle dot
@@ -29,6 +31,7 @@
 #include "ui.h"
 #include "ota_window.h"
 #include "esp_app_desc.h"
+#include "logic.h"   /* the rate ring + counter deltas, host-tested */
 
 #define C_BG     0x0a0a0c
 #define C_CARD   0x111115
@@ -71,6 +74,17 @@ static lv_obj_t *s_err_vals[ERR_COLS];   /* one multi-line label of counts per n
 static lv_obj_t *s_err_node[ERR_COLS];
 static lv_obj_t *s_col_served[ERR_COLS]; /* the 200-OK line above each refusal column */
 static lv_obj_t *s_ok_total;             /* fleet 200-OK, corner of the ledger tile */
+/* ---- REFUSALS (tile 2) ----
+ * The ledger says what each blade refused since it booted; this says WHEN
+ * and HOW MUCH: the last hour by the minute from heartbeat deltas (the rate
+ * ring in logic.h), the fleet's counts by kind as bars, and the live rate.
+ * "Ours" = the 5xx family, the only refusals that are the fleet's failure. */
+static lv_obj_t *s_ref_total, *s_ref_now, *s_ref_chart, *s_ref_peak, *s_ref_kind_vals;
+static lv_obj_t *s_ref_bar[SERVE_ERR_KINDS];
+static lv_chart_series_t *s_ref_ser_theirs, *s_ref_ser_ours;
+static bohun_rate_ring_t s_ref_theirs, s_ref_ours;
+static uint32_t s_ref_last_err, s_ref_last_srv;
+static bool s_ref_have_last;
 /* THE CONVERSIONS tile: the admin /clicks view on glass, plus the archive.
  * The kobzar folds any count a blade LOSES (wipe, retable, replacement) into
  * an NVS-backed base, so ALL TIME outlives every blade's flash - the kobzar
@@ -93,12 +107,6 @@ static int s_snap_n;
 static uint8_t s_leader_cache;
 static uint32_t s_last_req;
 static bool s_have_last_req;
-
-/* the baked page (little-endian RGB565, render_page_asset.py), mmapped from the
- * dedicated "page" flash partition - kept out of rodata so XIP-to-PSRAM stays cheap */
-#include "page_strip.h"
-#include "esp_partition.h"
-static lv_image_dsc_t s_page_dsc;
 
 /* the arms of the Zaporozhian Host, baked small (render_arms_asset.py) */
 extern const uint8_t arms_bin_start[] asm("_binary_arms_84x104_bin_start");
@@ -448,16 +456,16 @@ void ui_init(lv_display_t *disp)
     lv_obj_set_style_bg_color(scr, lv_color_hex(C_BG), 0);
     lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
 
-    /* ---- three tiles: mission control | what we refused | the served page ---- */
+    /* ---- five tiles: mission control | the ledger | refusals | conversions | the radio ---- */
     lv_obj_t *tv = lv_tileview_create(scr);
     lv_obj_set_size(tv, 800, 480);
     lv_obj_set_style_bg_opa(tv, LV_OPA_TRANSP, 0);
     lv_obj_set_scrollbar_mode(tv, LV_SCROLLBAR_MODE_OFF);
     s_tile0 = lv_tileview_add_tile(tv, 0, 0, LV_DIR_RIGHT);
     lv_obj_t *tile_err   = lv_tileview_add_tile(tv, 1, 0, LV_DIR_LEFT | LV_DIR_RIGHT);
-    lv_obj_t *tile_conv  = lv_tileview_add_tile(tv, 2, 0, LV_DIR_LEFT | LV_DIR_RIGHT);
-    lv_obj_t *tile_radio = lv_tileview_add_tile(tv, 3, 0, LV_DIR_LEFT | LV_DIR_RIGHT);
-    lv_obj_t *tile1      = lv_tileview_add_tile(tv, 4, 0, LV_DIR_LEFT);
+    lv_obj_t *tile_ref   = lv_tileview_add_tile(tv, 2, 0, LV_DIR_LEFT | LV_DIR_RIGHT);
+    lv_obj_t *tile_conv  = lv_tileview_add_tile(tv, 3, 0, LV_DIR_LEFT | LV_DIR_RIGHT);
+    lv_obj_t *tile_radio = lv_tileview_add_tile(tv, 4, 0, LV_DIR_LEFT);
 
     /* ---- tile 1: the refusal ledger --------------------------------------
      * Availability says how much we turned away; this says WHAT. Deliberately
@@ -504,9 +512,77 @@ void ui_init(lv_display_t *disp)
         }
     }
     mk_label(tile_err, 16, 444, &lv_font_montserrat_14, C_MUTED,
-             "swipe right for the radio, then the page - left for mission control");
+             "swipe right for refusals by the minute - left for mission control");
 
-    /* ---- tile 2: THE RADIO - the gossip tail ---------------------------- */
+    /* ---- tile 2: REFUSALS - by the minute, by kind, ours against theirs ---- */
+    mk_label(tile_ref, 16, 12, &lv_font_montserrat_28, C_LIME, "REFUSALS");
+    mk_label(tile_ref, 16, 46, &lv_font_montserrat_14, C_DIM,
+             "every non-2xx the fleet answered - by the minute, by kind, ours against theirs - kept off the public page");
+    s_ref_total = mk_label(tile_ref, 500, 8, &lv_font_montserrat_28, C_WARN, "-");
+    lv_obj_set_width(s_ref_total, 284);
+    lv_obj_set_style_text_align(s_ref_total, LV_TEXT_ALIGN_RIGHT, 0);
+    s_ref_now = mk_label(tile_ref, 500, 42, &lv_font_montserrat_14, C_DIM, "refused - fleet total");
+    lv_obj_set_width(s_ref_now, 284);
+    lv_obj_set_style_text_align(s_ref_now, LV_TEXT_ALIGN_RIGHT, 0);
+    {
+        /* left: the last hour, one bar per minute - amber theirs, red ours */
+        lv_obj_t *card = mk_card(tile_ref, 12, 72, 392, 364);
+        mk_label(card, 10, 8, &lv_font_montserrat_14, C_DIM, "LAST 60 MINUTES - refusals per minute");
+        s_ref_chart = lv_chart_create(card);
+        lv_obj_set_pos(s_ref_chart, 8, 30);
+        lv_obj_set_size(s_ref_chart, 376, 290);
+        lv_chart_set_type(s_ref_chart, LV_CHART_TYPE_BAR);
+        lv_chart_set_point_count(s_ref_chart, BOHUN_RATE_MINS);
+        lv_chart_set_update_mode(s_ref_chart, LV_CHART_UPDATE_MODE_SHIFT);
+        lv_chart_set_range(s_ref_chart, LV_CHART_AXIS_PRIMARY_Y, 0, 10);
+        lv_chart_set_div_line_count(s_ref_chart, 4, 0);
+        lv_obj_set_style_bg_color(s_ref_chart, lv_color_hex(C_CARD2), 0);
+        lv_obj_set_style_border_width(s_ref_chart, 0, 0);
+        lv_obj_set_style_line_color(s_ref_chart, lv_color_hex(C_BORDER), LV_PART_MAIN);
+        lv_obj_set_style_pad_column(s_ref_chart, 1, LV_PART_MAIN);
+        s_ref_ser_theirs = lv_chart_add_series(s_ref_chart, lv_color_hex(C_WARN), LV_CHART_AXIS_PRIMARY_Y);
+        s_ref_ser_ours   = lv_chart_add_series(s_ref_chart, lv_color_hex(C_LOST), LV_CHART_AXIS_PRIMARY_Y);
+        lv_chart_set_all_values(s_ref_chart, s_ref_ser_theirs, 0);
+        lv_chart_set_all_values(s_ref_chart, s_ref_ser_ours, 0);
+        s_ref_peak = mk_label(card, 10, 330, &lv_font_montserrat_14, C_MUTED,
+                              "amber = theirs (4xx), red = ours (5xx) - the first bar lands after a minute");
+        lv_obj_set_width(s_ref_peak, 372);
+    }
+    {
+        /* right: the fleet's refusals by kind - a bar each, longest = the biggest kind */
+        lv_obj_t *card = mk_card(tile_ref, 412, 72, 376, 364);
+        mk_label(card, 10, 8, &lv_font_montserrat_14, C_DIM, "BY KIND - fleet, since each blade's boot");
+        char names[256];
+        int np = 0;
+        for (int k = 0; k < SERVE_ERR_KINDS; k++) {
+            np += snprintf(names + np, sizeof(names) - np, "%s%s", k ? "\n" : "", ERR_NAME[k]);
+        }
+        lv_obj_t *nm = mk_label(card, 10, 34, &lv_font_montserrat_14, C_DIM, names);
+        lv_obj_set_style_text_line_space(nm, 8, 0);
+        for (int k = 0; k < SERVE_ERR_KINDS; k++) {
+            lv_obj_t *b = lv_bar_create(card);
+            lv_obj_set_pos(b, 136, 34 + k * 24 + 4);
+            lv_obj_set_size(b, 150, 10);
+            lv_bar_set_range(b, 0, 1000);
+            lv_bar_set_value(b, 0, LV_ANIM_OFF);
+            lv_obj_set_style_bg_color(b, lv_color_hex(C_CARD2), LV_PART_MAIN);
+            lv_obj_set_style_bg_opa(b, LV_OPA_COVER, LV_PART_MAIN);
+            lv_obj_set_style_radius(b, 2, LV_PART_MAIN);
+            lv_obj_set_style_bg_color(b, lv_color_hex(k < 3 ? C_LOST : C_WARN), LV_PART_INDICATOR);
+            lv_obj_set_style_radius(b, 2, LV_PART_INDICATOR);
+            s_ref_bar[k] = b;
+            if ((k & 3) == 3) vTaskDelay(1);   /* let IDLE breathe, as the ledger does */
+        }
+        s_ref_kind_vals = mk_label(card, 294, 34, &lv_font_montserrat_14, C_MUTED, "");
+        lv_obj_set_width(s_ref_kind_vals, 70);
+        lv_obj_set_style_text_line_space(s_ref_kind_vals, 8, 0);
+        lv_obj_set_style_text_align(s_ref_kind_vals, LV_TEXT_ALIGN_RIGHT, 0);
+        lv_label_set_recolor(s_ref_kind_vals, true);
+    }
+    mk_label(tile_ref, 16, 444, &lv_font_montserrat_14, C_MUTED,
+             "swipe right for conversions, then the radio - left for the ledger");
+
+    /* ---- tile 4: THE RADIO - the gossip tail ---------------------------- */
     mk_label(tile_radio, 16, 12, &lv_font_montserrat_28, C_LIME, "THE RADIO");
     mk_label(tile_radio, 16, 46, &lv_font_montserrat_14, C_DIM,
              "every heartbeat heard - esp-now, encrypted, 1 Hz per member");
@@ -520,62 +596,9 @@ void ui_init(lv_display_t *disp)
     lv_label_set_long_mode(s_radio_lbl, LV_LABEL_LONG_CLIP);
     lv_obj_set_width(s_radio_lbl, 748);
     mk_label(tile_radio, 16, 444, &lv_font_montserrat_14, C_MUTED,
-             "swipe right for the page the world sees - left for the ledger");
+             "the last tile - swipe left for conversions");
 
-    /* tile 1: the whole served page, vertically scrollable (mmapped from flash) */
-    const void *page_px = NULL;
-    const esp_partition_t *pp = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, 0x40, "page");
-    if (pp) {
-        esp_partition_mmap_handle_t mh;
-        if (esp_partition_mmap(pp, 0, (size_t)PAGE_STRIP_W * PAGE_STRIP_H * 2,
-                               ESP_PARTITION_MMAP_DATA, &page_px, &mh) != ESP_OK) {
-            page_px = NULL;
-        }
-    }
-    s_page_dsc.header.magic = LV_IMAGE_HEADER_MAGIC;
-    s_page_dsc.header.cf = LV_COLOR_FORMAT_RGB565;
-    s_page_dsc.header.w = PAGE_STRIP_W;
-    s_page_dsc.header.h = PAGE_STRIP_H;
-    s_page_dsc.header.stride = PAGE_STRIP_W * 2;
-    s_page_dsc.data_size = (uint32_t)PAGE_STRIP_W * PAGE_STRIP_H * 2;
-    s_page_dsc.data = page_px;
-    /* The image is ~7200 px tall. Parented straight to the tile, it made the TILE
-     * that tall, which made the TILEVIEW that tall - so the tileview's own scroll
-     * and the tile's fought each other and the render came apart mid-swipe. Give
-     * it a viewport instead: a container fixed at panel size that scrolls its own
-     * oversized child, with chaining off so a vertical drag never leaks out into
-     * the horizontal tile navigation. */
-    lv_obj_set_scroll_dir(tile1, LV_DIR_NONE);
-    lv_obj_set_scrollbar_mode(tile1, LV_SCROLLBAR_MODE_OFF);
-    if (page_px) {
-        lv_obj_t *vp = lv_obj_create(tile1);
-        lv_obj_remove_style_all(vp);
-        lv_obj_set_pos(vp, 0, 0);
-        lv_obj_set_size(vp, 800, 480);
-        lv_obj_set_style_bg_color(vp, lv_color_hex(C_BG), 0);
-        lv_obj_set_style_bg_opa(vp, LV_OPA_COVER, 0);
-        lv_obj_set_scroll_dir(vp, LV_DIR_VER);
-        lv_obj_set_scrollbar_mode(vp, LV_SCROLLBAR_MODE_ACTIVE);
-        /* Vertical chaining OFF so a drag on the page never leaks into tile
-         * navigation. Horizontal chaining stays ON - without it a sideways swipe
-         * inside the viewport has nowhere to go and you are stranded on this tile. */
-        lv_obj_remove_flag(vp, LV_OBJ_FLAG_SCROLL_CHAIN_VER);
-        lv_obj_add_flag(vp, LV_OBJ_FLAG_SCROLL_CHAIN_HOR);
-        /* momentum on: a flick should carry, or 7000 px of page is a long drag */
-        lv_obj_add_flag(vp, LV_OBJ_FLAG_SCROLL_MOMENTUM);
-        lv_obj_remove_flag(vp, LV_OBJ_FLAG_SCROLL_ELASTIC);
-
-        lv_obj_t *img = lv_image_create(vp);
-        lv_image_set_src(img, &s_page_dsc);
-        lv_obj_set_pos(img, 0, 0);
-        mk_label(vp, 12, PAGE_STRIP_H + 8, &lv_font_montserrat_14, C_MUTED,
-                 "what the world sees - swipe left to return");
-    } else {
-        mk_label(tile1, 260, 220, &lv_font_montserrat_16, C_DIM,
-                 "page partition is empty - run idf.py flash");
-    }
-
-    /* ---- tile 3 in swipe order: the conversions ledger ---- */
+    /* ---- tile 3: the conversions ledger (fourth in swipe order) ---- */
     mk_label(tile_conv, 16, 12, &lv_font_montserrat_28, C_LIME, "CONVERSIONS");
     mk_label(tile_conv, 16, 46, &lv_font_montserrat_14, C_DIM,
              "who clicked to give - per blade, fleet sum, and the kobzar's own archive of what wiped blades forgot");
@@ -1289,7 +1312,53 @@ void ui_update(const swarm_snap_entry_t *e, int n, uint8_t leader_id)
         lv_label_set_text(s_err_vals[c], vals);
     }
 
-    /* ---- tile 2: the gossip tail, newest first, 45 s window ---- */
+    /* ---- the refusals tile: by the minute, by kind, ours against theirs ---- */
+    {
+        uint32_t fleet_err = 0, fleet_srv = 0, kinds[SERVE_ERR_KINDS] = {0}, kmax = 0;
+        for (int i = 0; i < n; i++) {
+            if (!s[i].eligible) continue;
+            fleet_err += s[i].req_err;
+            fleet_srv += s[i].req_err_srv;
+            for (int k = 0; k < SERVE_ERR_KINDS; k++) kinds[k] += s[i].err_kind[k];
+        }
+        /* one second's worth, split: ours is the 5xx subset of everything */
+        uint32_t d_all = bohun_delta(fleet_err, s_ref_last_err, s_ref_have_last);
+        uint32_t d_srv = bohun_delta(fleet_srv, s_ref_last_srv, s_ref_have_last);
+        s_ref_last_err = fleet_err;
+        s_ref_last_srv = fleet_srv;
+        s_ref_have_last = true;
+        bool rolled = bohun_rate_add(&s_ref_theirs, d_all > d_srv ? d_all - d_srv : 0);
+        bohun_rate_add(&s_ref_ours, d_srv);
+        if (rolled) {
+            lv_chart_set_next_value(s_ref_chart, s_ref_ser_theirs, bohun_rate_last_min(&s_ref_theirs));
+            lv_chart_set_next_value(s_ref_chart, s_ref_ser_ours, bohun_rate_last_min(&s_ref_ours));
+            uint16_t pk = bohun_rate_peak(&s_ref_theirs);
+            if (bohun_rate_peak(&s_ref_ours) > pk) pk = bohun_rate_peak(&s_ref_ours);
+            lv_chart_set_range(s_ref_chart, LV_CHART_AXIS_PRIMARY_Y, 0, pk < 10 ? 10 : pk);
+            lv_label_set_text_fmt(s_ref_peak, "peak %u/min - this hour %lu refused, %lu of them ours (5xx)",
+                                  (unsigned)pk, (unsigned long)(bohun_rate_hour(&s_ref_theirs) + bohun_rate_hour(&s_ref_ours)),
+                                  (unsigned long)bohun_rate_hour(&s_ref_ours));
+        }
+        {
+            char tot[16];
+            fmt_count(tot, sizeof(tot), fleet_err);
+            lv_label_set_text(s_ref_total, tot);
+            lv_obj_set_style_text_color(s_ref_total, lv_color_hex(fleet_err ? C_WARN : C_MUTED), 0);
+            lv_label_set_text_fmt(s_ref_now, "%lu/min now - refused, fleet total",
+                                  (unsigned long)(bohun_rate_last60(&s_ref_theirs) + bohun_rate_last60(&s_ref_ours)));
+        }
+        for (int k = 0; k < SERVE_ERR_KINDS; k++) if (kinds[k] > kmax) kmax = kinds[k];
+        char vals[256];
+        int vp = 0;
+        for (int k = 0; k < SERVE_ERR_KINDS; k++) {
+            lv_bar_set_value(s_ref_bar[k], kmax ? (int32_t)((uint64_t)kinds[k] * 1000 / kmax) : 0, LV_ANIM_OFF);
+            vp += snprintf(vals + vp, sizeof(vals) - vp, "%s#%06x %lu#",
+                           k ? "\n" : "", kinds[k] ? C_TEXT : C_MUTED, (unsigned long)kinds[k]);
+        }
+        lv_label_set_text(s_ref_kind_vals, vals);
+    }
+
+    /* ---- tile 4: the gossip tail, newest first, 45 s window ---- */
     {
         #define RADIO_SHOW 19   /* 19 x 18 px = 342, inside the 364 px card */
         static swarm_radio_evt_t tail[64];

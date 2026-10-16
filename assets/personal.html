@@ -95,7 +95,7 @@
   }
   .hero-pre::before{content:'';display:inline-block;width:40px;height:1px;background:var(--accent);vertical-align:middle;margin-right:16px}
   .hero h1{
-    font-family:var(--serif);font-size:clamp(44px,7.5vw,88px);font-weight:400;
+    font-family:var(--serif);font-size:clamp(42px,7.1vw,84px);font-weight:400;
     line-height:1.02;letter-spacing:-.03em;color:var(--text);margin-bottom:28px;
     opacity:0;animation:fadeUp .8s ease .15s forwards;
   }
@@ -333,6 +333,28 @@
     .reveal{opacity:1;transform:none}
   }
 </style>
+<!-- Meta Pixel Code -->
+<!-- Meta's base code, verbatim, for the Facebook page. It loads fbevents.js from
+     connect.facebook.net, fires PageView and sets the _fbp cookie on every visit.
+     The page's "One resource" card and llms.txt say so - a claim on the wire has
+     to match the wire. A consent gate would be one line before the init
+     (fbq('consent','revoke')) plus a banner that grants it; neither exists. -->
+<script>
+!function(f,b,e,v,n,t,s)
+{if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];
+s.parentNode.insertBefore(t,s)}(window, document,'script',
+'https://connect.facebook.net/en_US/fbevents.js');
+fbq('init', '192996542523797');
+fbq('track', 'PageView');
+</script>
+<noscript><img height="1" width="1" style="display:none"
+src="https://www.facebook.com/tr?id=192996542523797&ev=PageView&noscript=1"
+/></noscript>
+<!-- End Meta Pixel Code -->
 </head>
 <body>
 
@@ -1792,7 +1814,7 @@
       </div>
       <div class="card reveal">
         <h3>One resource</h3>
-        <p>The entire site is a single brotli-compressed HTML file with no external fonts, scripts, trackers or CDNs. A first-time visitor pays for one TLS handshake and one response.</p>
+        <p>The entire site is a single brotli-compressed HTML file with no external fonts or CDNs. The one third-party script is a Meta pixel for the Facebook page. A first-time visitor pays for one TLS handshake and one response.</p>
       </div>
       <div class="card reveal">
         <h3>Deterministic election</h3>
@@ -2002,10 +2024,23 @@
 
 <script>
   /* the conversion ledger: a click on any data-c link beacons its slug to the
-     fleet itself (POST /c) - counted on-shelf, no third party in the loop */
+     fleet itself (POST /c) - counted on-shelf. The same click is also a Meta
+     "Donate" event for the pixel in <head>. */
   document.getElementById('donate').addEventListener('click', function (e) {
     var a = e.target.closest ? e.target.closest('a[data-c]') : null;
     if (a && navigator.sendBeacon) navigator.sendBeacon('/c?k=' + a.getAttribute('data-c'));
+    if (a && window.fbq) fbq('track', 'Donate', { content_name: a.getAttribute('data-c') });
+  });
+  /* outbound clicks to GitHub and LinkedIn, anywhere on the page, as a Meta
+     OutboundClick with the destination named. Pixel only: the on-shelf click
+     ledger has six slugs that ride the frozen heartbeat frame, so it stays
+     as it is. */
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest ? e.target.closest('a[href]') : null;
+    if (!a || !window.fbq) return;
+    var host = (a.hostname || '').replace(/^www\./, '');
+    var dest = host === 'github.com' ? 'github' : host === 'linkedin.com' ? 'linkedin' : null;
+    if (dest) fbq('trackCustom', 'OutboundClick', { content_name: dest, content_ids: [a.pathname] });
   });
 
 (function(){

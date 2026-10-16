@@ -7,7 +7,6 @@
 #
 #   tools/deploy_observer.sh display <ip>          # app -> pysar
 #   tools/deploy_observer.sh mission <ip>          # app -> kobzar
-#   tools/deploy_observer.sh mission <ip> --page   # page strip -> kobzar
 #
 # No gates, no fleet order - a window push touches one observer, and the boot
 # trial (60 s alive + a peer heard, or rollback) is the safety net. Needs
@@ -15,9 +14,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-VARIANT="${1:-}"; IP="${2:-}"; WHAT="${3:-}"
+VARIANT="${1:-}"; IP="${2:-}"
 [ -n "$VARIANT" ] && [ -n "$IP" ] || {
-    echo "usage: $0 display|mission <ip> [--page]" >&2; exit 2; }
+    echo "usage: $0 display|mission <ip>" >&2; exit 2; }
 [ -n "${BOHUN_OTA_KEY:-}" ] || {
     echo "BOHUN_OTA_KEY not set - see tools/gen_secrets.sh output" >&2; exit 2; }
 
@@ -27,11 +26,6 @@ mission) BIN="${BIN:-firmware/mission/build/bohun_mission.bin}" ;;
 *) echo "unknown variant '$VARIANT'" >&2; exit 2 ;;
 esac
 DOOR="/ota"
-if [ "$WHAT" = "--page" ]; then
-    [ "$VARIANT" = "mission" ] || { echo "--page is kobzar-only" >&2; exit 2; }
-    BIN="firmware/mission/main/page_strip.bin"
-    DOOR="/page"
-fi
 [ -f "$BIN" ] || { echo "no $BIN - build first" >&2; exit 2; }
 
 SIZE=$(wc -c < "$BIN" | tr -d ' ')

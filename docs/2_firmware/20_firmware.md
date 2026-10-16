@@ -207,6 +207,9 @@ Every member keeps two forensic partitions, so no reboot goes unexplained:
   amber line (edge-triggered), mask claimed/lost, OTA in/ok, trial verdicts,
   refused variants, chronicle lines, die-temperature crossings.
 - **The coredump partition**: full panic post-mortems.
+- **The refusal sampler** (RAM, `GET :8443/refusals`): the last 32 refused
+  requests with peer, listener, status, request line and Host - a count of
+  4xx says how many; this says who and what they asked for.
 
 Reading a blade: `GET :8443/blackbox` (text, newest first) and
 `GET :8443/coredump -o core.bin`, then

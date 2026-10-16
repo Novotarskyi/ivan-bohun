@@ -35,6 +35,7 @@ _Static_assert(SERVE_ERR_KINDS == HTTPD_ERR_CODE_MAX,
 extern const uint8_t page_gz_start[]    asm("_binary_personal_html_gz_start");
 extern const uint8_t page_gz_end[]      asm("_binary_personal_html_gz_end");
 static void tally(httpd_err_code_t err);   /* defined with the counters below */
+static void sample_refusal(httpd_req_t *req, uint16_t status, bool bad_host, const char *host_seen);
 
 extern const uint8_t page_br_start[]    asm("_binary_personal_html_br_start");
 extern const uint8_t page_br_end[]      asm("_binary_personal_html_br_end");
@@ -335,12 +336,14 @@ static esp_err_t roster_get_handler(httpd_req_t *req)
 {
     if (req->content_len) {          /* a GET with a body: refuse before reading a byte */
         tally(HTTPD_400_BAD_REQUEST);
+        sample_refusal(req, 400, false, NULL);
         httpd_resp_set_status(req, "400 Bad Request");
         httpd_resp_sendstr(req, "");
         return ESP_FAIL;
     }
     if (!origin_is_self(req)) {
         tally(HTTPD_403_FORBIDDEN);
+        sample_refusal(req, 403, false, NULL);
         httpd_resp_set_status(req, "403 Forbidden");
         httpd_resp_set_type(req, "application/json");
         httpd_resp_sendstr(req, "{\"err\":\"cross-origin refused\"}");
@@ -614,6 +617,7 @@ static esp_err_t redirect_handler(httpd_req_t *req)
     if (!dest) {
         /* unknown or absent Host: say nothing about who or where we are */
         tally(HTTPD_400_BAD_REQUEST);
+        sample_refusal(req, 400, true, host);
         httpd_resp_set_status(req, "400 Bad Request");
         httpd_resp_set_type(req, "text/plain");
         httpd_resp_sendstr(req, "bad host\n");
@@ -680,9 +684,67 @@ static void tally(httpd_err_code_t err)
     swarm_record_refusal(ours);
 }
 
+/* THE REFUSAL SAMPLER (logic.h): the last 32 refusals with peer, listener,
+ * request line and Host, so a flood of 400s has a face. RAM only, 3.3 KB,
+ * written under the tally lock, read at GET :8443/refusals. Every refusal
+ * feeds it: httpd's own error callback and the three hand-made ones. */
+static bohun_refusals_t s_refusals;
+
+/* index -> status is bohun_err_status() in logic.h, shared with whoever reads
+ * err_kind[] by index; the two counts are pinned to each other below. */
+_Static_assert(BOHUN_ERR_KINDS == SERVE_ERR_KINDS, "logic.h's status table must cover every httpd error kind");
+
+static void sample_refusal(httpd_req_t *req, uint16_t status, bool bad_host, const char *host_seen)
+{
+    int fd = httpd_req_to_sockfd(req);
+    struct sockaddr_in sa;
+    socklen_t sl = sizeof(sa);
+    uint32_t peer = 0;
+    uint16_t port = 0;
+    if (fd >= 0 && getpeername(fd, (struct sockaddr *)&sa, &sl) == 0 && sa.sin_family == AF_INET) {
+        peer = ntohl(sa.sin_addr.s_addr);
+    }
+    sl = sizeof(sa);
+    if (fd >= 0 && getsockname(fd, (struct sockaddr *)&sa, &sl) == 0) {
+        port = ntohs(sa.sin_port);
+    }
+    /* httpd's parser stores the method before the URI (httpd_parse.c, cb_url)
+     * and zeroes both between requests, so an empty URI means the request
+     * line never parsed - and method would read as DELETE (0). Say nothing. */
+    const char *method = req->uri[0] ? http_method_str((enum http_method)req->method) : "-";
+    char host[BOHUN_REFUSAL_HOST] = "";
+    if (host_seen) {
+        bohun_refusal_clip(host, sizeof(host), host_seen);
+    } else {
+        /* absent or unparsed -> stays ""; a long value arrives clipped (TRUNC) */
+        (void)httpd_req_get_hdr_value_str(req, "Host", host, sizeof(host));
+    }
+    uint32_t now_ms = (uint32_t)(esp_timer_get_time() / 1000);
+    portENTER_CRITICAL(&s_tally_mux);
+    bohun_refusal_record(&s_refusals, now_ms, peer, port, status, bad_host, method, req->uri, host);
+    portEXIT_CRITICAL(&s_tally_mux);
+}
+
+/* GET /refusals - the sampler, newest first. A snapshot under the tally lock,
+ * rendered outside it: the writers are three httpd tasks that must not wait
+ * behind a 4 KB print. */
+static esp_err_t refusals_admin_handler(httpd_req_t *req)
+{
+    static bohun_refusals_t snap;    /* admin instance = its own task; see roster_admin_handler */
+    static char buf[4096];
+    portENTER_CRITICAL(&s_tally_mux);
+    snap = s_refusals;
+    portEXIT_CRITICAL(&s_tally_mux);
+    size_t n = bohun_refusal_dump(&snap, buf, sizeof(buf));
+    httpd_resp_set_type(req, "text/plain");
+    return httpd_resp_send(req, buf, (ssize_t)n);
+}
+static const httpd_uri_t refusals_uri = { .uri = "/refusals", .method = HTTP_GET, .handler = refusals_admin_handler };
+
 static esp_err_t counted_err(httpd_req_t *req, httpd_err_code_t err)
 {
     tally(err);
+    sample_refusal(req, bohun_err_status((unsigned)err), false, NULL);
     if (err_is_ours(err)) {
         /* a 5xx is OUR failure - remember the request it happened to, and
          * the heap truth of the moment. This is what makes a lone 500 in a
@@ -799,6 +861,9 @@ void serve_start(void)
      * takes +2. Getting this wrong costs the node its OTA door. */
     adm.httpd.ctrl_port = ESP_HTTPD_DEF_CTRL_PORT + 2;
     adm.httpd.max_open_sockets = 2;
+    /* The default cap is 8 and a failed registration is not fatal - a ninth
+     * handler would simply vanish. Count them when adding one. */
+    adm.httpd.max_uri_handlers = 9;
 
     httpd_handle_t admin = NULL;
     if (httpd_ssl_start(&admin, &adm) == ESP_OK) {
@@ -810,6 +875,7 @@ void serve_start(void)
         httpd_register_uri_handler(admin, &bbx_uri);    /* the flight recorder */
         httpd_register_uri_handler(admin, &core_uri);   /* raw panic core, if any */
         httpd_register_uri_handler(admin, &cpu_uri);    /* where the CPU actually goes */
+        httpd_register_uri_handler(admin, &refusals_uri); /* the last 32 refusals, with faces */
         httpd_register_uri_handler(admin, &clicks_admin); /* this blade's conversion tallies */
         register_err_counters(admin);
         cpustat_start();

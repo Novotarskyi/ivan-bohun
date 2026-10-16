@@ -375,6 +375,165 @@ static void test_pair_silent_client_never_spoke(void)
     TEST_ASSERT_FALSE(bohun_pair_silent(true, 1000, 999999, 8000)); /* it spoke: the idle rule owns it */
 }
 
+/* ---- refusal sampler ---------------------------------------------------- */
+
+static void test_refusal_clip_terminates_and_fills_blanks(void)
+{
+    char d[8];
+    bohun_refusal_clip(d, sizeof(d), NULL);
+    TEST_ASSERT_EQUAL_STRING("-", d);
+    bohun_refusal_clip(d, sizeof(d), "");
+    TEST_ASSERT_EQUAL_STRING("-", d);
+    bohun_refusal_clip(d, sizeof(d), "abcdefg");       /* exact fit */
+    TEST_ASSERT_EQUAL_STRING("abcdefg", d);
+    bohun_refusal_clip(d, sizeof(d), "abcdefghijkl");  /* clipped to cap-1 */
+    TEST_ASSERT_EQUAL_STRING("abcdefg", d);
+}
+
+static void test_refusal_record_clips_every_field(void)
+{
+    static bohun_refusals_t r;
+    memset(&r, 0, sizeof(r));
+    char longuri[101];
+    memset(longuri, 'a', 100);
+    longuri[100] = '\0';
+    bohun_refusal_record(&r, 10, 0, 80, 404, false, "", longuri, NULL);
+    TEST_ASSERT_EQUAL_UINT32(1, r.total);
+    TEST_ASSERT_EQUAL_STRING("-", r.rec[0].method);
+    TEST_ASSERT_EQUAL_STRING("-", r.rec[0].host);
+    TEST_ASSERT_EQUAL_size_t(BOHUN_REFUSAL_URI - 1, strlen(r.rec[0].uri));
+}
+
+static void test_refusal_dump_line_format(void)
+{
+    static bohun_refusals_t r;
+    memset(&r, 0, sizeof(r));
+    bohun_refusal_record(&r, 3661234, 0xCB007107u /* 203.0.113.7 */, 80, 400, true,
+                         "GET", "/", "203.0.113.9");
+    char out[512];
+    size_t n = bohun_refusal_dump(&r, out, sizeof(out));
+    TEST_ASSERT_EQUAL_size_t(strlen(out), n);
+    TEST_ASSERT_EQUAL_STRING_LEN("refusals total=1 showing=1 (", out, 28);
+    TEST_ASSERT_NOT_NULL(strstr(out, "\n#1 +3661.234s :80 203.0.113.7 400 bad-host GET / host=203.0.113.9\n"));
+}
+
+static void test_refusal_dump_empty_is_header_only(void)
+{
+    static bohun_refusals_t r;
+    memset(&r, 0, sizeof(r));
+    char out[256];
+    size_t n = bohun_refusal_dump(&r, out, sizeof(out));
+    TEST_ASSERT_EQUAL_STRING_LEN("refusals total=0 showing=0 (", out, 28);
+    TEST_ASSERT_NULL(strchr(out, '#'));
+    TEST_ASSERT_EQUAL_size_t(strlen(out), n);
+}
+
+static void test_refusal_ring_wraps_newest_first(void)
+{
+    static bohun_refusals_t r;
+    memset(&r, 0, sizeof(r));
+    for (unsigned i = 1; i <= BOHUN_REFUSAL_N + 1; i++) {
+        bohun_refusal_record(&r, i, 0x0A000001u, 8080, 404, false, "GET", "/x", "h");
+    }
+    TEST_ASSERT_EQUAL_UINT32(BOHUN_REFUSAL_N + 1, r.total);
+    char out[4096];
+    bohun_refusal_dump(&r, out, sizeof(out));
+    TEST_ASSERT_NOT_NULL(strstr(out, "showing=32 ("));
+    TEST_ASSERT_NOT_NULL(strstr(out, "\n#33 +"));          /* newest, right after the header */
+    TEST_ASSERT_NOT_NULL(strstr(out, "\n#2 +"));           /* the oldest survivor */
+    TEST_ASSERT_NULL(strstr(out, "\n#1 +"));               /* overwritten by #33 */
+    TEST_ASSERT_TRUE(strstr(out, "\n#33 +") < strstr(out, "\n#2 +"));
+}
+
+static void test_refusal_dump_truncates_on_a_line_boundary(void)
+{
+    static bohun_refusals_t r;
+    memset(&r, 0, sizeof(r));
+    bohun_refusal_record(&r, 1000, 0x0A000001u, 80, 404, false, "GET", "/aa", "h");
+    bohun_refusal_record(&r, 2000, 0x0A000001u, 80, 404, false, "GET", "/bb", "h");
+    char full[1024];
+    size_t f = bohun_refusal_dump(&r, full, sizeof(full));
+    char cut[1024];
+    size_t c = bohun_refusal_dump(&r, cut, f);          /* one byte short of the whole text */
+    TEST_ASSERT_TRUE(c < f);
+    TEST_ASSERT_EQUAL_size_t(strlen(cut), c);
+    TEST_ASSERT_EQUAL_CHAR('\n', cut[c - 1]);           /* ends on a whole line */
+    TEST_ASSERT_NOT_NULL(strstr(cut, "\n#2 +"));        /* the newest survived */
+    TEST_ASSERT_NULL(strstr(cut, "\n#1 +"));            /* the oldest was dropped whole */
+}
+
+/* ---- rate ring + counter deltas + the status table ---------------------- */
+
+static void test_err_status_table(void)
+{
+    TEST_ASSERT_EQUAL_UINT16(500, bohun_err_status(0));
+    TEST_ASSERT_EQUAL_UINT16(505, bohun_err_status(2));
+    TEST_ASSERT_EQUAL_UINT16(400, bohun_err_status(3));
+    TEST_ASSERT_EQUAL_UINT16(404, bohun_err_status(6));
+    TEST_ASSERT_EQUAL_UINT16(431, bohun_err_status(12));
+    TEST_ASSERT_EQUAL_UINT16(0, bohun_err_status(13));
+}
+
+static void test_delta_treats_reset_as_fresh_start(void)
+{
+    TEST_ASSERT_EQUAL_UINT32(7, bohun_delta(10, 3, true));
+    TEST_ASSERT_EQUAL_UINT32(0, bohun_delta(2, 9, true));    /* ran backwards: a reboot */
+    TEST_ASSERT_EQUAL_UINT32(0, bohun_delta(5, 0, false));   /* first reading: no rate yet */
+}
+
+static void test_rate_ring_rolls_once_per_minute(void)
+{
+    static bohun_rate_ring_t r;
+    memset(&r, 0, sizeof(r));
+    for (int i = 0; i < 59; i++) {
+        TEST_ASSERT_FALSE(bohun_rate_add(&r, 2));
+    }
+    TEST_ASSERT_EQUAL_UINT16(0, bohun_rate_last_min(&r));
+    TEST_ASSERT_TRUE(bohun_rate_add(&r, 2));
+    TEST_ASSERT_EQUAL_UINT8(1, r.min_n);
+    TEST_ASSERT_EQUAL_UINT16(120, bohun_rate_last_min(&r));
+    TEST_ASSERT_EQUAL_UINT32(120, bohun_rate_last60(&r));
+    TEST_ASSERT_EQUAL_UINT32(120, bohun_rate_hour(&r));
+}
+
+static void test_rate_ring_last60_slides(void)
+{
+    static bohun_rate_ring_t r;
+    memset(&r, 0, sizeof(r));
+    for (int i = 0; i < 60; i++) bohun_rate_add(&r, 1);
+    TEST_ASSERT_EQUAL_UINT32(60, bohun_rate_last60(&r));
+    for (int i = 0; i < 30; i++) bohun_rate_add(&r, 0);
+    TEST_ASSERT_EQUAL_UINT32(30, bohun_rate_last60(&r));   /* half the window has aged out */
+    TEST_ASSERT_EQUAL_UINT32(60, bohun_rate_hour(&r));     /* the hour still remembers all 60 */
+}
+
+static void test_rate_ring_saturates_instead_of_wrapping(void)
+{
+    static bohun_rate_ring_t r;
+    memset(&r, 0, sizeof(r));
+    bohun_rate_add(&r, 70000);
+    TEST_ASSERT_EQUAL_UINT16(0xffff, r.sec[0]);
+    for (int i = 0; i < 59; i++) bohun_rate_add(&r, 0);
+    TEST_ASSERT_EQUAL_UINT16(0xffff, bohun_rate_last_min(&r));
+    TEST_ASSERT_EQUAL_UINT32(0xffff, bohun_rate_hour(&r));
+}
+
+static void test_rate_ring_peak_forgets_after_an_hour(void)
+{
+    static bohun_rate_ring_t r;
+    memset(&r, 0, sizeof(r));
+    for (int i = 0; i < 60; i++) bohun_rate_add(&r, 5);     /* minute 1: 300, the peak */
+    for (int m = 0; m < 59; m++) {
+        for (int i = 0; i < 60; i++) bohun_rate_add(&r, 1); /* minutes 2..60: 60 each */
+    }
+    TEST_ASSERT_EQUAL_UINT8(60, r.min_n);
+    TEST_ASSERT_EQUAL_UINT16(300, bohun_rate_peak(&r));
+    for (int i = 0; i < 60; i++) bohun_rate_add(&r, 1);     /* minute 61 overwrites minute 1 */
+    TEST_ASSERT_EQUAL_UINT8(60, r.min_n);
+    TEST_ASSERT_EQUAL_UINT16(60, bohun_rate_peak(&r));
+    TEST_ASSERT_EQUAL_UINT32(3600, bohun_rate_hour(&r));
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -423,5 +582,17 @@ int main(void)
     RUN_TEST(test_probe_fit_survives_49_day_wrap);
     RUN_TEST(test_probe_room_leaves_two_blocks_spare);
     RUN_TEST(test_pair_silent_client_never_spoke);
+    RUN_TEST(test_refusal_clip_terminates_and_fills_blanks);
+    RUN_TEST(test_refusal_record_clips_every_field);
+    RUN_TEST(test_refusal_dump_line_format);
+    RUN_TEST(test_refusal_dump_empty_is_header_only);
+    RUN_TEST(test_refusal_ring_wraps_newest_first);
+    RUN_TEST(test_refusal_dump_truncates_on_a_line_boundary);
+    RUN_TEST(test_err_status_table);
+    RUN_TEST(test_delta_treats_reset_as_fresh_start);
+    RUN_TEST(test_rate_ring_rolls_once_per_minute);
+    RUN_TEST(test_rate_ring_last60_slides);
+    RUN_TEST(test_rate_ring_saturates_instead_of_wrapping);
+    RUN_TEST(test_rate_ring_peak_forgets_after_an_hour);
     return UNITY_END();
 }

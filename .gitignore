@@ -36,10 +36,6 @@ dependencies.lock
 # public-served content and og.png has no in-repo generator.
 firmware/eth/main/personal.html.gz
 firmware/eth/main/personal.html.br
-# page_strip.bin is 12 MB of baked RGB565 and regenerates from the live page
-# (firmware/mission/render_page_asset.py); the 4-line header it emits ships,
-# so a fresh clone compiles before its first render.
-firmware/mission/main/page_strip.bin
 docs/**/diagrams/_*.html
 docs/**/diagrams/_*.png
 
