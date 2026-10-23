@@ -8,6 +8,7 @@
 #include "freertos/task.h"
 #include "esp_netif.h"
 #include "esp_eth.h"
+#include "esp_netif_sntp.h"
 #include "esp_event.h"
 #include "esp_log.h"
 #include "ethernet_init.h"
@@ -20,6 +21,7 @@
 #include "vitals.h"
 #include "selftest.h"
 #include "splice.h"
+#include "thermal.h"
 #include "sdkconfig.h"
 
 static const char *TAG = "bohun_eth";
@@ -105,6 +107,14 @@ void app_main(void)
 
     ESP_ERROR_CHECK(esp_eth_start(eth_handles[0]));
 
+    /* THE FLEET'S CLOCK (eth v20): the blades are the only members with a wire
+     * to the internet, so they fetch NTP here and gossip it over the radio
+     * (swarm.c's time beacon) for the observers, whose only clock this is.
+     * Starts now and retries on its own until DHCP has handed over a DNS
+     * server; nothing on the serving path waits for it. */
+    esp_sntp_config_t sntp = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
+    ESP_ERROR_CHECK(esp_netif_sntp_init(&sntp));
+
     /* Radio first, server second: the fleet gets a truthful serving=0 window
      * while TLS binds (the rail's amber "booting"). Safe only because the
      * election gates on serve_is_ready() - exposure without candidacy. */
@@ -112,6 +122,7 @@ void app_main(void)
     blackbox_init();
     vitals_start();   /* before the swarm: the first heartbeat carries a reading */
     swarm_start();
+    thermal_start();  /* the 24-hour die-temperature ring the page draws (GET /temps) */
     serve_start();
 
     /* D8: if this image arrived by OTA it is on trial until it proves it can

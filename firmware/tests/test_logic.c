@@ -534,6 +534,148 @@ static void test_rate_ring_peak_forgets_after_an_hour(void)
     TEST_ASSERT_EQUAL_UINT32(3600, bohun_rate_hour(&r));
 }
 
+/* ---- the fleet's clock ------------------------------------------------- */
+
+static void test_time_sane_boundary(void)
+{
+    TEST_ASSERT_FALSE(bohun_time_sane(0));
+    TEST_ASSERT_FALSE(bohun_time_sane(86400u * 365u));       /* an ESP32 a year after its 1970 boot */
+    TEST_ASSERT_TRUE(bohun_time_sane(BOHUN_TIME_SANE_S));
+    TEST_ASSERT_TRUE(bohun_time_sane(1760000000u));           /* 2025-10 */
+}
+
+static void test_time_adopt_unset_local_takes_a_sane_beacon(void)
+{
+    TEST_ASSERT_TRUE(bohun_time_adopt(1234, 1760000000u, 3));
+    TEST_ASSERT_FALSE(bohun_time_adopt(1234, 5678, 3));       /* the sender's clock is unset too */
+}
+
+static void test_time_adopt_holds_jitter_corrects_drift(void)
+{
+    TEST_ASSERT_FALSE(bohun_time_adopt(1760000000u, 1760000003u, 3));   /* inside the tolerance */
+    TEST_ASSERT_FALSE(bohun_time_adopt(1760000003u, 1760000000u, 3));
+    TEST_ASSERT_TRUE(bohun_time_adopt(1760000000u, 1760000004u, 3));    /* one past it */
+    TEST_ASSERT_TRUE(bohun_time_adopt(1760000400u, 1760000000u, 3));    /* either direction */
+}
+
+/* ---- the thermal history ----------------------------------------------- */
+
+static bohun_temp_hist_t s_hist;   /* 22 KB - static, never on the test's stack */
+
+static void test_temp_record_refuses_an_unset_clock_and_a_bad_node(void)
+{
+    memset(&s_hist, 0, sizeof(s_hist));
+    TEST_ASSERT_FALSE(bohun_temp_record(&s_hist, 0, 30, 550));
+    TEST_ASSERT_FALSE(bohun_temp_record(&s_hist, BOHUN_TEMP_NODES, 1760000000u, 550));
+    TEST_ASSERT_EQUAL_INT16(0, bohun_temp_value(&s_hist, 0, bohun_temp_bucket(30), BOHUN_TEMP_AVG));
+    TEST_ASSERT_EQUAL_INT16(0, bohun_temp_value(&s_hist, BOHUN_TEMP_NODES, bohun_temp_bucket(1760000000u), BOHUN_TEMP_AVG));
+}
+
+static void test_temp_bucket_aggregates_max_min_avg(void)
+{
+    memset(&s_hist, 0, sizeof(s_hist));
+    uint32_t t = 1760000000u;   /* three readings, one second apart, same bucket */
+    TEST_ASSERT_TRUE(bohun_temp_record(&s_hist, 2, t,     600));
+    TEST_ASSERT_TRUE(bohun_temp_record(&s_hist, 2, t + 1, 650));
+    TEST_ASSERT_TRUE(bohun_temp_record(&s_hist, 2, t + 2, 610));
+    uint32_t b = bohun_temp_bucket(t);
+    TEST_ASSERT_EQUAL_INT16(650, bohun_temp_value(&s_hist, 2, b, BOHUN_TEMP_MAX));
+    TEST_ASSERT_EQUAL_INT16(600, bohun_temp_value(&s_hist, 2, b, BOHUN_TEMP_MIN));
+    TEST_ASSERT_EQUAL_INT16(620, bohun_temp_value(&s_hist, 2, b, BOHUN_TEMP_AVG));
+    /* another node in that bucket, and the same node one bucket on: nobody heard */
+    TEST_ASSERT_EQUAL_INT16(0, bohun_temp_value(&s_hist, 3, b, BOHUN_TEMP_MAX));
+    TEST_ASSERT_EQUAL_INT16(0, bohun_temp_value(&s_hist, 2, b + 1, BOHUN_TEMP_MAX));
+}
+
+static void test_temp_slot_reused_a_day_later_forgets_the_old_day(void)
+{
+    memset(&s_hist, 0, sizeof(s_hist));
+    uint32_t t = 1760000000u;
+    uint32_t b = bohun_temp_bucket(t);
+    bohun_temp_record(&s_hist, 0, t, 500);
+    bohun_temp_record(&s_hist, 1, t, 510);
+    /* 24 h later the same slot comes round, and only node 0 speaks */
+    uint32_t t2 = t + BOHUN_TEMP_BUCKETS * BOHUN_TEMP_BUCKET_S;
+    bohun_temp_record(&s_hist, 0, t2, 420);
+    TEST_ASSERT_EQUAL_INT16(0,   bohun_temp_value(&s_hist, 0, b, BOHUN_TEMP_AVG));   /* yesterday is gone */
+    TEST_ASSERT_EQUAL_INT16(0,   bohun_temp_value(&s_hist, 1, b, BOHUN_TEMP_AVG));   /* for every node */
+    TEST_ASSERT_EQUAL_INT16(0,   bohun_temp_value(&s_hist, 1, b + BOHUN_TEMP_BUCKETS, BOHUN_TEMP_AVG));   /* silent today */
+    TEST_ASSERT_EQUAL_INT16(420, bohun_temp_value(&s_hist, 0, b + BOHUN_TEMP_BUCKETS, BOHUN_TEMP_AVG));
+}
+
+static void test_temp_ticks_every_three_hours_on_the_round_hour(void)
+{
+    uint16_t idx[16];
+    uint8_t hour[16];
+    /* now = 1700000000 (2023-11-14 22:13:20 UTC). The window starts at bucket
+     * 5666379 = 1699913700; the first 3-hour mark inside it is 1699920000 =
+     * 2023-11-14 00:00 UTC, 21 buckets in, then one every 36 buckets. */
+    int n = bohun_temp_ticks(1700000000u, 3, idx, hour, 16);
+    TEST_ASSERT_EQUAL_INT(8, n);
+    static const uint16_t want_idx[8]  = { 21, 57, 93, 129, 165, 201, 237, 273 };
+    static const uint8_t  want_hour[8] = { 0, 3, 6, 9, 12, 15, 18, 21 };
+    TEST_ASSERT_EQUAL_UINT16_ARRAY(want_idx, idx, 8);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(want_hour, hour, 8);
+    TEST_ASSERT_EQUAL_INT(3, bohun_temp_ticks(1700000000u, 3, idx, hour, 3));   /* the cap holds */
+}
+
+static void test_hour_label_twelve_hour_clock(void)
+{
+    char s[8];
+    bohun_hour_label(0, s, sizeof(s));  TEST_ASSERT_EQUAL_STRING("12am", s);
+    bohun_hour_label(1, s, sizeof(s));  TEST_ASSERT_EQUAL_STRING("1am", s);
+    bohun_hour_label(12, s, sizeof(s)); TEST_ASSERT_EQUAL_STRING("12pm", s);
+    bohun_hour_label(15, s, sizeof(s)); TEST_ASSERT_EQUAL_STRING("3pm", s);
+    bohun_hour_label(23, s, sizeof(s)); TEST_ASSERT_EQUAL_STRING("11pm", s);
+}
+
+static void test_temp_slots_are_the_racks_six(void)
+{
+    TEST_ASSERT_EQUAL_INT(0, bohun_temp_slot(1));
+    TEST_ASSERT_EQUAL_INT(3, bohun_temp_slot(4));
+    TEST_ASSERT_EQUAL_INT(4, bohun_temp_slot(6));
+    TEST_ASSERT_EQUAL_INT(5, bohun_temp_slot(7));
+    TEST_ASSERT_EQUAL_INT(-1, bohun_temp_slot(5));    /* the shelf spare has no line */
+    TEST_ASSERT_EQUAL_INT(-1, bohun_temp_slot(0));
+    for (unsigned s = 0; s < BOHUN_TEMP_NODES; s++) {
+        TEST_ASSERT_EQUAL_INT((int)s, bohun_temp_slot(bohun_temp_slot_id(s)));   /* round trip */
+    }
+    TEST_ASSERT_EQUAL_UINT8(0, bohun_temp_slot_id(BOHUN_TEMP_NODES));
+}
+
+static void test_temp_json_series_nulls_gaps_and_fits(void)
+{
+    memset(&s_hist, 0, sizeof(s_hist));
+    uint32_t now = 1760000000u;
+    /* the newest bucket has three readings; the one before it has one; the rest were never heard */
+    bohun_temp_record(&s_hist, 1, now,     600);
+    bohun_temp_record(&s_hist, 1, now + 1, 620);
+    bohun_temp_record(&s_hist, 1, now + 2, 610);
+    bohun_temp_record(&s_hist, 1, now - BOHUN_TEMP_BUCKET_S, 555);
+    static char out[1600];
+    size_t len = bohun_temp_json_series(&s_hist, 1, now + 2, BOHUN_TEMP_AVG, out, sizeof(out));
+    TEST_ASSERT_TRUE(len > 0);
+    TEST_ASSERT_EQUAL_UINT(len, strlen(out));
+    TEST_ASSERT_EQUAL_CHAR('[', out[0]);
+    TEST_ASSERT_EQUAL_CHAR(']', out[len - 1]);
+    TEST_ASSERT_EQUAL_STRING_LEN("[null,null,", out, 11);
+    TEST_ASSERT_NOT_NULL(strstr(out, ",555,610]"));           /* ...the two heard buckets end the window */
+    /* 286 nulls + two numbers = 288 elements */
+    int commas = 0;
+    for (const char *c = out; *c; c++) if (*c == ',') commas++;
+    TEST_ASSERT_EQUAL_INT(BOHUN_TEMP_BUCKETS - 1, commas);
+    /* another node heard nothing at all: all null, and still a valid array */
+    len = bohun_temp_json_series(&s_hist, 0, now + 2, BOHUN_TEMP_MAX, out, sizeof(out));
+    TEST_ASSERT_EQUAL_UINT(2 + 4 * BOHUN_TEMP_BUCKETS + (BOHUN_TEMP_BUCKETS - 1), len);
+    /* max and min of the newest bucket */
+    len = bohun_temp_json_series(&s_hist, 1, now + 2, BOHUN_TEMP_MAX, out, sizeof(out));
+    TEST_ASSERT_NOT_NULL(strstr(out, ",555,620]"));
+    len = bohun_temp_json_series(&s_hist, 1, now + 2, BOHUN_TEMP_MIN, out, sizeof(out));
+    TEST_ASSERT_NOT_NULL(strstr(out, ",555,600]"));
+    /* a buffer too small refuses whole, rather than handing back a truncated array */
+    TEST_ASSERT_EQUAL_UINT(0, bohun_temp_json_series(&s_hist, 1, now + 2, BOHUN_TEMP_AVG, out, 100));
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -594,5 +736,15 @@ int main(void)
     RUN_TEST(test_rate_ring_last60_slides);
     RUN_TEST(test_rate_ring_saturates_instead_of_wrapping);
     RUN_TEST(test_rate_ring_peak_forgets_after_an_hour);
+    RUN_TEST(test_time_sane_boundary);
+    RUN_TEST(test_time_adopt_unset_local_takes_a_sane_beacon);
+    RUN_TEST(test_time_adopt_holds_jitter_corrects_drift);
+    RUN_TEST(test_temp_record_refuses_an_unset_clock_and_a_bad_node);
+    RUN_TEST(test_temp_bucket_aggregates_max_min_avg);
+    RUN_TEST(test_temp_slot_reused_a_day_later_forgets_the_old_day);
+    RUN_TEST(test_temp_ticks_every_three_hours_on_the_round_hour);
+    RUN_TEST(test_hour_label_twelve_hour_clock);
+    RUN_TEST(test_temp_slots_are_the_racks_six);
+    RUN_TEST(test_temp_json_series_nulls_gaps_and_fits);
     return UNITY_END();
 }

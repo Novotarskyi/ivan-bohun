@@ -53,6 +53,9 @@ Music Group, Deliveroo, HappyCar, ironSource, Sixt/DriveNow.
 - `/roster` - live JSON view of the swarm. **Please do not poll this.** It is
   live telemetry served by a microcontroller; crawling it consumes the capacity
   real visitors need. Deliberately contains no network addresses.
+- `/temps` - the last 24 hours of every member's die temperature in 5-minute
+  buckets (max, min, average), as the blade that answers remembers it. The
+  same request: do not poll it. No addresses either.
 
 ## Notes for machines
 

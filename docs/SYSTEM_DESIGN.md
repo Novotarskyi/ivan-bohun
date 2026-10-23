@@ -184,20 +184,29 @@ is always safe. What it carries:
 Consumers: the election, the public `/roster` JSON (which never carries
 addresses - the admin variant on 8443 adds them), and both observers.
 
+A second, 16-byte frame with its own magic rides the same radio every tenth
+heartbeat: the **time beacon**, by which the blades (the only members with a
+route to NTP) hand the observers a clock. Images that predate it drop it at
+the door unread, so the heartbeat itself never changed shape.
+
 ## Observability
 
 - **Public**: the site's live fleet table polls `/roster` every 3 s - roles,
   status in plain words, served counts, link bars, die temperature, the
-  load balancer's ledger, fleet p50/p95 averaged over the serving blades. No IPs,
+  load balancer's ledger, fleet p50/p95 averaged over the serving blades. Below
+  it, a 24-hour chart of every member's die temperature in 5-minute buckets
+  (max / min / avg), drawn from `/temps` - each blade keeps the same thermal
+  ring the kobzar draws and serves its own memory of the day. No IPs,
   no MACs, no internal ports.
 - **Pysar (2.8")**: identity and firmware version, radio-loss line, roster
   with per-blade served counts, fleet totals and availability, rail mirror,
   tap-to-blank, and a touch-held OTA window.
-- **Kobzar (4.3")**: five tiles - mission control (status and served columns,
+- **Kobzar (4.3")**: six tiles - mission control (status and served columns,
   fleet-wide traffic chart, chronicle with the reboot coroner, reign records),
   THE LEDGER (per-blade HTTP-200s above the refusal table), REFUSALS (the last
   hour by the minute, the fleet's refusals by kind, ours against theirs), CONVERSIONS,
-  and THE RADIO (the gossip tail, 45 s window, seq-gap markers).
+  TEMPERATURE (every die's last 24 hours in 5-minute UTC buckets, max / min /
+  avg on a tap) and THE RADIO (the gossip tail, 45 s window, seq-gap markers).
 - **LED rail** (6x SK6812 RGBW, one pixel per member, one global brightness
   cap): lost red, booting amber fast-blink, release amber slow-blink, benched
   amber solid, balancing deep green, serving faint white, pysar deepest blue,

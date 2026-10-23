@@ -15,7 +15,7 @@ the implementation reference:
 - [`24_display_led.md`](24_display_led.md) - the pysar: 2.8" roster glass and
   the LED rail
 - [`25_display_mission_control.md`](25_display_mission_control.md) - the
-  kobzar: 4.3" touch mission control, five tiles
+  kobzar: 4.3" touch mission control, six tiles
 - [`26_ota_deployments.md`](26_ota_deployments.md) - releases: the update
   door, blade deploys, the observer OTA window
 

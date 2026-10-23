@@ -9,7 +9,7 @@ if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/personal.html.gz")
         "  brotli -f -q 11 assets/personal.html -o firmware/eth/main/personal.html.br")
 endif()
 
-idf_component_register(SRCS "eth_main.c" "serve.c" "swarm.c" "swarm_identity.c" "ota.c" "mask.c" "blackbox.c" "cpustat.c" "selftest.c" "vitals.c" "splice.c"
+idf_component_register(SRCS "eth_main.c" "serve.c" "swarm.c" "swarm_identity.c" "ota.c" "mask.c" "blackbox.c" "cpustat.c" "selftest.c" "vitals.c" "splice.c" "thermal.c"
                        PRIV_REQUIRES esp_netif esp_eth esp_event esp_https_server esp_wifi nvs_flash esp_timer app_update esp_hw_support esp_partition esp_driver_tsens
                        INCLUDE_DIRS "."
                        EMBED_FILES "personal.html.gz" "personal.html.br" "favicon.ico" "favicon.ico.gz" "favicon.ico.br" "llms.txt" "robots.txt" "og.png"

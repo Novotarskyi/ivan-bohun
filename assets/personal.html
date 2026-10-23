@@ -38,6 +38,8 @@
     --lost:#ff5555;
     --border:#1e1e25;
     --border-light:#2a2a33;
+    /* the fleet's six, as the kobzar draws them: four blades, the pysar, the kobzar in text */
+    --t1:#14b8a6;--t2:#d95926;--t3:#e2b53a;--t4:#6366f1;--t5:#c084fc;--t6:#e8e6e3;
     /* self-hosted law: no external font requests, ever. system stacks only. */
     --mono:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace;
     --serif:Georgia,'Iowan Old Style','Times New Roman',serif;
@@ -182,6 +184,19 @@
   .fleet-stat-label{font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;white-space:nowrap}
   .fleet-stat-value{font-family:var(--serif);font-size:26px;font-style:italic;color:var(--text)}
   .fleet-note{padding:16px 26px;font-family:var(--mono);font-size:11px;color:var(--text-muted);line-height:1.7;border-top:1px solid var(--border)}
+  /* the fleet's day: 24 h of die temperature under the roster */
+  .heat-modes{display:flex;gap:8px}
+  .heat-mode{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--text-dim);background:transparent;border:1px solid var(--border-light);border-radius:2px;padding:7px 14px;cursor:pointer;transition:color .2s,border-color .2s,background .2s}
+  .heat-mode:hover{color:var(--text);border-color:var(--text-muted)}
+  .heat-mode.is-on{color:var(--bg);background:var(--accent);border-color:var(--accent)}
+  .heat-plot{position:relative;padding:18px 26px 4px}
+  .heat-plot svg{width:100%;height:auto;display:block;cursor:crosshair}
+  .heat-tip{position:absolute;pointer-events:none;background:var(--bg-card-hover);border:1px solid var(--border-light);border-radius:3px;padding:8px 10px;font-family:var(--mono);font-size:11px;color:var(--text-dim);line-height:1.65;white-space:nowrap;z-index:3}
+  .heat-tip b{color:var(--text);font-weight:500}
+  .heat-tip i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:7px;vertical-align:-1px}
+  .heat-legend{display:flex;flex-wrap:wrap;gap:8px 22px;padding:10px 26px 18px;font-family:var(--mono);font-size:11px;color:var(--text-dim)}
+  .heat-legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:8px;vertical-align:-1px}
+  @media(max-width:768px){.heat-plot{padding:14px 12px 2px}.heat-legend{padding:8px 12px 14px;gap:6px 16px}.heat-mode{padding:6px 10px}}
 
   /* DIAGRAMS */
   .diagram{background:var(--bg-card);border:1px solid var(--border);padding:32px 26px;margin-bottom:2px}
@@ -381,14 +396,13 @@ src="https://www.facebook.com/tr?id=192996542523797&ev=PageView&noscript=1"
     <h1>This page is not<br>in the <em>cloud</em>.</h1>
     <p class="hero-sub">
       It is being served to you, right now, by four <strong>ESP32-S3 microcontroller
-      blades</strong>, sitting on a shelf in a London flat. They are watched over by two more
-      <strong>observer units</strong> that witness and visualize the swarm.
+      blades</strong> on a shelf in a London flat, watched by two <strong>observer units</strong>
+      that paint what the swarm is doing.
     </p>
     <p class="hero-sub">
-      The router forwards every request to one immortal virtual MAC address: <strong>the
+      The router forwards every request to one immortal virtual MAC address, <strong>the
       mask</strong>, worn by whichever blade won the election. The wearer hands your connection to
-      the least busy blade, so you are answered by a different microcontroller from the one you
-      connected to.
+      the least busy blade, so the microcontroller answering you is not the one you connected to.
     </p>
     <p class="hero-sub">
       Every blade carries both programs, balancer and server, and the mask moves between them by
@@ -434,11 +448,10 @@ src="https://www.facebook.com/tr?id=192996542523797&ev=PageView&noscript=1"
     <p class="section-label reveal">Live</p>
     <h2 class="section-title reveal">The <em>fleet</em>, as you read this</h2>
     <p class="section-intro reveal">
-      This table is not a screenshot. Your browser is polling <code>/roster</code> on the same
-      machine that sent you this page, every three seconds. The blades gossip over an encrypted
-      ESP-NOW radio mesh once a second, and each heartbeat carries the fleet's whole picture: who
-      is alive and serving, how strong every link is, what each blade has answered and how fast,
-      and what the balancer has relayed.
+      This table is not a screenshot. Your browser polls <code>/roster</code> on the machine that
+      sent you this page, every three seconds. The blades gossip over encrypted ESP-NOW radio once
+      a second, and each heartbeat carries the whole picture: who is alive and serving, how strong
+      each link is, what every blade has answered and how fast, and what the balancer has relayed.
     </p>
 
     <div class="fleet reveal">
@@ -511,33 +524,52 @@ src="https://www.facebook.com/tr?id=192996542523797&ev=PageView&noscript=1"
         </div>
       </div>
       <p class="fleet-note" id="f-note">
-        The names come from the Cossacks: the <b>otaman</b> is the
-        elected leader, wears the mask and hands every arriving connection to somebody else,
-        while each <b>kozak</b> does the actual work of answering it. Every serving blade
-        carries both programs, so which one it is doing depends only on who currently holds
-        the address. The <b>pysar</b> is the scribe that watches and keeps
-        the record, and the <b>kobzar</b> is named for the wandering bards who carried Cossack
-        history in song - here, the big screen that keeps the swarm's chronicle.
+        The names are Cossack. The <b>otaman</b> is the elected leader: it wears the mask and
+        hands every arriving connection to a <b>kozak</b>, which answers it. Every serving blade
+        carries both programs; which one it runs depends only on who holds the address. The
+        <b>pysar</b> is the scribe keeping the record; the <b>kobzar</b>, named for the bards who
+        carried Cossack history in song, is the big screen keeping the chronicle.
         <br><br>
-        Since the fleet
-        started balancing, the elected node stops serving pages itself: it holds the mask,
-        takes every incoming connection, and splices it to a kozak that does the TLS work.
-        It works at layer 4, TCP, and never sees where one request ends and the next
-        begins, so it counts <b>connections</b> while the blades count <b>requests</b> -
-        those are different numbers, since your browser pulls this page, its
-        favicon, the og image and every roster poll down a single connection it keeps open.
-        The blades' figures in the table are requests; the otaman's is their sum.
+        The elected node serves no pages itself: it takes every incoming connection and splices
+        it to a kozak, which does the TLS work. Working at layer 4, it never sees where one
+        request ends and the next begins, so it counts <b>connections</b> while the blades count
+        <b>requests</b>. Those differ because your browser pulls this page, its favicon, the og
+        image and every roster poll down one connection it keeps open. The blades' figures in
+        the table are requests; the otaman's is their sum.
         <br><br>
-        <b>Connections received</b> is what arrived at the door since this node was elected,
-        <b>relayed</b> is what reached a clean finish, and <b>connections refused</b> is what
-        was turned away instantly because every backend was already busy.
-        <b>Broken mid-transfer</b> is a connection that died in flight, usually a reader
-        closing the tab; <b>closed after stalling</b> is one that went silent and was cleaned
-        up rather than left squatting a slot. In the second row, <b>connect to backend</b> is
-        how long the balancer waits to reach a kozak, and <b>time to TLS first byte</b> is how
-        long until that kozak sends its first TLS byte back. The <b>response times</b> come from
-        the blades instead - each kozak times every request it answers and reports its own
-        p50 and p95, and these are the average across the serving ones.
+        <b>Connections received</b> arrived at the door since this node was elected;
+        <b>relayed</b> reached a clean finish; <b>refused</b> were turned away at once because
+        every backend was busy. <b>Broken mid-transfer</b> died in flight, usually a reader
+        closing the tab; <b>closed after stalling</b> went silent and were cleaned up rather
+        than left squatting a slot. In the second row, <b>connect to backend</b> is how long the
+        balancer waits to reach a kozak and <b>time to TLS first byte</b> how long until that
+        kozak answers with its first TLS byte. The <b>response times</b> come from the blades:
+        each kozak times every request it answers and reports its own p50 and p95, averaged
+        here across the serving ones.
+      </p>
+    </div>
+
+    <!-- the fleet's day: every member's die temperature over the last 24 hours, from /temps -->
+    <div class="fleet reveal" id="heat" style="margin-top:2px">
+      <div class="fleet-head">
+        <span class="fleet-title">die temperature &middot; last 24 hours &middot; 5-minute buckets &middot; utc</span>
+        <div class="heat-modes" role="group" aria-label="which statistic of each bucket to draw">
+          <button type="button" class="heat-mode" data-stat="max">max</button>
+          <button type="button" class="heat-mode" data-stat="min">min</button>
+          <button type="button" class="heat-mode is-on" data-stat="avg">avg</button>
+        </div>
+      </div>
+      <div class="heat-plot" id="heat-plot">
+        <svg id="heat-svg" role="img" aria-label="Die temperature of every fleet member over the last 24 hours, one line per member, in 5-minute buckets"></svg>
+        <div class="heat-tip" id="heat-tip" hidden></div>
+      </div>
+      <div class="heat-legend" id="heat-legend"></div>
+      <p class="fleet-note" id="heat-note">
+        Every heartbeat carries the sender's die temperature. The blade serving you folds all six
+        into five-minute buckets and keeps a day of them; your browser draws that memory from
+        <code>/temps</code> once a minute. Die temperature, not air: it runs well above the room,
+        and only the differences mean anything. A gap is a bucket this blade did not hear - it
+        remembers only since its own last boot. Hour marks are UTC.
       </p>
     </div>
   </div>
@@ -560,10 +592,10 @@ src="https://www.facebook.com/tr?id=192996542523797&ev=PageView&noscript=1"
     <p class="section-label reveal">Architecture</p>
     <h2 class="section-title reveal">Distributed system, <em>in miniature</em></h2>
     <p class="section-intro reveal">
-      The trick that makes a swarm of disposable microcontrollers behave like one durable server
-      is that the identity is not attached to any of them. The blade holding the identity acts as
-      a Level 4 TCP splicer, relaying your connection to one of the downstream serving blades. The
-      fleet behaves like a single machine, but the work is spread across all of them.
+      What makes a swarm of disposable microcontrollers behave like one durable server is that
+      the identity is attached to none of them. The blade holding it acts as a layer 4 TCP
+      splicer, relaying your connection to a serving blade behind it: one machine to the world,
+      the work spread across all of them.
     </p>
 
     <div class="diagram reveal">
@@ -901,11 +933,11 @@ src="https://www.facebook.com/tr?id=192996542523797&ev=PageView&noscript=1"
 </svg>
       <!-- shelf-iso:end -->
       <p class="diagram-cap">
-        <b>The machine itself.</b> Four serving blades on their pads, each with its own jack into
-        the six-port fabric. The small screen is the pysar keeping the roster; the 4.3 inch
-        touch panel is the kobzar keeping the chronicle. Along the front edge runs an SK6812 rail
-        with one pixel per member: lime for the otaman, white for the kozaky, blue for the pysar,
-        purple for mission control. Your request enters at the switch, <span style="color:var(--accent)">rides the lime cable
+        <b>The machine itself.</b> Four serving blades on their pads, each jacked into the
+        six-port fabric. The small screen is the pysar keeping the roster; the 4.3 inch touch
+        panel is the kobzar keeping the chronicle. Along the front edge an SK6812 rail carries one
+        pixel per member: lime for the otaman, white for the kozaky, blue for the pysar, purple
+        for the kobzar. Your request enters at the switch, <span style="color:var(--accent)">rides the lime cable
         up to the mask holder</span>, and is <span style="color:var(--alive)">spliced back down the
         green one to the kozak</span> that answers it.
       </p>
@@ -982,11 +1014,11 @@ src="https://www.facebook.com/tr?id=192996542523797&ev=PageView&noscript=1"
         </g>
       </svg>
       <p class="diagram-cap">
-        <b>The mask.</b> The address you connect to is a locally administered MAC that no factory
-        ever issued. The elected leader writes it into its own Ethernet controller and claims the
-        static IP. Lose that node and the next one in line writes the same address into itself,
-        sends a gratuitous ARP so the switch relearns the port, and carries on answering. The
-        visitor never learns that anything died.
+        <b>The mask.</b> The address you connect to is a locally administered MAC no factory ever
+        issued. The elected leader writes it into its own Ethernet controller and claims the
+        static IP. Lose that node and the next in line writes the same address into itself, sends
+        a gratuitous ARP so the switch relearns the port, and carries on. The visitor never learns
+        that anything died.
       </p>
     </div>
 
@@ -1618,74 +1650,9 @@ src="https://www.facebook.com/tr?id=192996542523797&ev=PageView&noscript=1"
           </svg>
         </div>
         <p>
-          A wider glass for wider truth: health badge, live release progress, sixty-sample
-          sparklines per node and a scrolling chronicle of everything the swarm has done.
-        </p>
-        <div class="screen-frame" style="padding:20px 12px;margin-top:16px">
-          <svg viewBox="0 0 300 84" role="img" aria-label="This very page as a miniature strip, flick-scrolled by a finger on the panel.">
-            <rect x="10" y="10" width="280" height="56" rx="6" fill="#0e0e13" stroke="#22222b"/>
-            <clipPath id="pageClip"><rect x="16" y="14" width="268" height="52" rx="4"/></clipPath>
-            <g clip-path="url(#pageClip)">
-              <g class="chron-scroll">
-                <animateTransform attributeName="transform" type="translate"
-                  values="0 0;0 -38;0 -38;0 -74;0 -74;0 -106;0 -106;0 -140"
-                  keyTimes="0;0.085;0.245;0.33;0.49;0.575;0.735;1"
-                  calcMode="spline"
-                  keySplines="0.12 0.8 0.2 1;0 0 1 1;0.12 0.8 0.2 1;0 0 1 1;0.12 0.8 0.2 1;0 0 1 1;0.12 0.8 0.2 1"
-                  dur="6.4s" repeatCount="indefinite"/>
-                <g transform="translate(0,18)">
-                  <rect x="24" y="0" width="118" height="7" rx="1.5" fill="#e8e6e3"/>
-                  <rect x="24" y="11" width="88" height="7" rx="1.5" fill="#e8e6e3"/>
-                  <rect x="116" y="11" width="30" height="7" rx="1.5" fill="#c4f04d"/>
-                  <rect x="24" y="26" width="230" height="2.5" fill="#3a3a44"/>
-                  <rect x="24" y="32" width="244" height="2.5" fill="#3a3a44"/>
-                  <rect x="24" y="38" width="176" height="2.5" fill="#3a3a44"/>
-                  <rect x="24" y="48" width="42" height="11" rx="2" fill="#15151b" stroke="#22222b" stroke-width=".6"/>
-                  <rect x="72" y="48" width="42" height="11" rx="2" fill="#15151b" stroke="#22222b" stroke-width=".6"/>
-                  <rect x="120" y="48" width="42" height="11" rx="2" fill="#15151b" stroke="#22222b" stroke-width=".6"/>
-                  <rect x="168" y="48" width="42" height="11" rx="2" fill="#15151b" stroke="#22222b" stroke-width=".6"/>
-                  <rect x="28" y="52" width="14" height="3" fill="#c4f04d"/>
-                  <rect x="24" y="66" width="230" height="28" rx="3" fill="#101016" stroke="#22222b" stroke-width=".6"/>
-                  <circle cx="42" cy="80" r="2.5" fill="#43e86a"/><circle cx="60" cy="80" r="2.5" fill="#43e86a"/><circle cx="78" cy="80" r="2.5" fill="#43e86a"/>
-                  <path d="M150,86 Q190,70 244,76" fill="none" stroke="#c4f04d" stroke-width="1.2"/>
-                  <circle cx="28" cy="102" r="2" fill="#43e86a"/><rect x="36" y="100.5" width="216" height="2.5" fill="#2a2a33"/>
-                  <circle cx="28" cy="110" r="2" fill="#43e86a"/><rect x="36" y="108.5" width="216" height="2.5" fill="#2a2a33"/>
-                  <circle cx="28" cy="118" r="2" fill="#f0a04d"/><rect x="36" y="116.5" width="216" height="2.5" fill="#2a2a33"/>
-                  <rect x="86" y="128" width="128" height="3.5" fill="#55555f"/>
-                  <rect x="102" y="134" width="96" height="3.5" fill="#55555f"/>
-                </g>
-                <g transform="translate(0,158)">
-                  <rect x="24" y="0" width="118" height="7" rx="1.5" fill="#e8e6e3"/>
-                  <rect x="24" y="11" width="88" height="7" rx="1.5" fill="#e8e6e3"/>
-                  <rect x="116" y="11" width="30" height="7" rx="1.5" fill="#c4f04d"/>
-                  <rect x="24" y="26" width="230" height="2.5" fill="#3a3a44"/>
-                  <rect x="24" y="32" width="244" height="2.5" fill="#3a3a44"/>
-                  <rect x="24" y="38" width="176" height="2.5" fill="#3a3a44"/>
-                  <rect x="24" y="48" width="42" height="11" rx="2" fill="#15151b" stroke="#22222b" stroke-width=".6"/>
-                  <rect x="72" y="48" width="42" height="11" rx="2" fill="#15151b" stroke="#22222b" stroke-width=".6"/>
-                  <rect x="120" y="48" width="42" height="11" rx="2" fill="#15151b" stroke="#22222b" stroke-width=".6"/>
-                  <rect x="168" y="48" width="42" height="11" rx="2" fill="#15151b" stroke="#22222b" stroke-width=".6"/>
-                  <rect x="28" y="52" width="14" height="3" fill="#c4f04d"/>
-                  <rect x="24" y="66" width="230" height="28" rx="3" fill="#101016" stroke="#22222b" stroke-width=".6"/>
-                  <circle cx="42" cy="80" r="2.5" fill="#43e86a"/><circle cx="60" cy="80" r="2.5" fill="#43e86a"/><circle cx="78" cy="80" r="2.5" fill="#43e86a"/>
-                  <path d="M150,86 Q190,70 244,76" fill="none" stroke="#c4f04d" stroke-width="1.2"/>
-                  <circle cx="28" cy="102" r="2" fill="#43e86a"/><rect x="36" y="100.5" width="216" height="2.5" fill="#2a2a33"/>
-                  <circle cx="28" cy="110" r="2" fill="#43e86a"/><rect x="36" y="108.5" width="216" height="2.5" fill="#2a2a33"/>
-                  <circle cx="28" cy="118" r="2" fill="#f0a04d"/><rect x="36" y="116.5" width="216" height="2.5" fill="#2a2a33"/>
-                  <rect x="86" y="128" width="128" height="3.5" fill="#55555f"/>
-                  <rect x="102" y="134" width="96" height="3.5" fill="#55555f"/>
-                </g>
-              </g>
-              <circle class="chron-finger" cx="272" cy="58" r="5" fill="#e8e6e3" opacity="0">
-                <animate attributeName="opacity" values="0;.28;0;0;.28;0;0;.28;0;0;.28;0;0" keyTimes="0;0.04;0.1;0.245;0.29;0.35;0.49;0.535;0.6;0.735;0.78;0.85;1" dur="6.4s" repeatCount="indefinite"/>
-                <animate attributeName="cy" values="58;34;58;34;58;34;58;34;58" keyTimes="0;0.085;0.245;0.33;0.49;0.575;0.735;0.82;1" dur="6.4s" repeatCount="indefinite"/>
-              </circle>
-            </g>
-            <text x="150" y="79" font-size="9" fill="#4a4850" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" text-anchor="middle">this very page, baked to a strip &middot; scrolled by finger</text>
-          </svg>
-        </div>
-        <p>
-          It also renders this very page, baked to a pixel strip and scrolled by finger.
+          A wider glass for wider truth: six swipeable tiles - mission control with the chronicle
+          and its reboot coroner, the refusal ledger, refusals by the minute, conversions, a day
+          of die temperatures, and the radio's own gossip tail.
         </p>
       </div>
 
@@ -1699,10 +1666,9 @@ src="https://www.facebook.com/tr?id=192996542523797&ev=PageView&noscript=1"
     <p class="section-label reveal">Made by hand</p>
     <h2 class="section-title reveal">Two hundred and ninety-two <em>joints</em></h2>
     <p class="section-intro reveal">
-      None of this arrived assembled (unintentionally). Every header, every breakout, every wire
-      in the level shifter was soldered on a kitchen table by someone who had barely held a
-      soldering iron in July&nbsp;2026, and every joint was proven with a multimeter before it was
-      ever given power.
+      None of this arrived assembled (unintentionally). Every header, breakout and shifter wire
+      was soldered on a kitchen table by someone who had barely held an iron in July&nbsp;2026,
+      and every joint met a multimeter before it met power.
     </p>
 
     <div class="build-grid reveal">
@@ -1727,12 +1693,11 @@ src="https://www.facebook.com/tr?id=192996542523797&ev=PageView&noscript=1"
         <div class="bs-n">02</div>
         <h4>Power, broken out</h4>
         <p>
-          Four USB-C breakouts pinned by hand, and every one of them carries all four wires now:
-          power, ground, and both data lines into the ESP32-S3&rsquo;s native USB. The data pairs
-          were an afterthought that became doctrine the night a bad update bricked the fleet&rsquo;s
-          own update door - since then each blade flashes from its own port, no dongle, no
-          harness-swapping, and one board&rsquo;s reversed pin order is why every pair met a
-          multimeter before it met a computer.
+          Four USB-C breakouts pinned by hand, each carrying all four wires: power, ground and
+          both data lines into the ESP32-S3&rsquo;s native USB. The data pairs were an afterthought
+          until the night a bad update bricked the fleet&rsquo;s own update door; since then every
+          blade flashes from its own port, no dongle, no harness-swapping. One board&rsquo;s
+          reversed pin order is why every pair met a multimeter before it met a computer.
         </p>
       </div>
       <div class="build-step">
@@ -1777,10 +1742,9 @@ src="https://www.facebook.com/tr?id=192996542523797&ev=PageView&noscript=1"
         <div class="bs-n">07</div>
         <h4>A kurin for every blade</h4>
         <p>
-          Next, the naked boards get walls: each blade moves into its own 3D-printed kurin - a
-          ventilated barracks it slides into like a drawer, RJ45 nose out, a wire bay for the
-          breakout and the slack. Case by printed case, the swarm
-          becomes a frankenstein imitation of manufacturing.
+          The naked boards get walls: each blade slides like a drawer into its own 3D-printed
+          kurin, a ventilated barracks with the RJ45 nose out and a bay for the breakout and the
+          slack. Case by printed case, the swarm becomes a frankenstein imitation of manufacturing.
         </p>
       </div>
       <div class="build-step">
@@ -1802,7 +1766,7 @@ src="https://www.facebook.com/tr?id=192996542523797&ev=PageView&noscript=1"
     <div class="grid-cards">
       <div class="card reveal">
         <h3>Wire silence</h3>
-        <p>Only the node wearing the mask answers the world. The other blades receive their visitors through it over the LAN and send nothing outward on their own, so from outside the swarm looks like a single quiet machine.</p>
+        <p>Only the node wearing the mask answers the world. The others receive their visitors through it over the LAN and send nothing outward on their own, so from outside the swarm is one quiet machine.</p>
       </div>
       <div class="card reveal">
         <h3>Crash only</h3>
@@ -1818,7 +1782,7 @@ src="https://www.facebook.com/tr?id=192996542523797&ev=PageView&noscript=1"
       </div>
       <div class="card reveal">
         <h3>Deterministic election</h3>
-        <p>The lowest numbered candidate that is healthy both on radio and network leads. Every node computes the same answer from the same heartbeats, making leader election deterministic.</p>
+        <p>The lowest-numbered candidate healthy on both radio and wire leads. Every node computes the same answer from the same heartbeats: no votes, no coordinator.</p>
       </div>
       <div class="card reveal">
         <h3>Reachable forever</h3>
@@ -2334,11 +2298,150 @@ src="https://www.facebook.com/tr?id=192996542523797&ev=PageView&noscript=1"
     poll();
   }
 
+  /* ── the fleet's day: 24 h of die temperature, drawn from /temps ──
+     The blade serving you keeps the same 5-minute ring the kobzar draws and
+     hands it over as JSON: six nodes x 288 buckets x max/min/avg, tenths of a
+     degree, null where it heard nothing. Fixed 30-80 C axis (the die sensor
+     tops out at 80), hour marks every three hours on the round UTC hour, a
+     gap wherever the blade has no memory. Once a minute while on screen. */
+  var HEAT = ['var(--t1)','var(--t2)','var(--t3)','var(--t4)','var(--t5)','var(--t6)'];
+  var heatSvg = $('heat-svg'), heatPlot = $('heat-plot'), heatTip = $('heat-tip');
+  var heatData = null, heatStat = 'avg', heatEver = false, heatGeo = null;
+
+  function heatHour(h){ var h12 = h % 12 || 12; return h12 + (h < 12 ? 'am' : 'pm'); }
+  function heatPad(n){ return (n < 10 ? '0' : '') + n; }
+
+  function heatRender(){
+    var d = heatData;
+    if (!d || !heatSvg || !heatPlot) return;
+    var W = Math.max(280, heatPlot.clientWidth - (window.innerWidth <= 768 ? 24 : 52));
+    var narrow = W < 560, H = narrow ? 230 : 320;
+    var L = 36, R = 12, T = 10, B = 26, pw = W - L - R, ph = H - T - B;
+    var N = d.n || 288, BS = d.bucket_s || 300;
+    var nowB = Math.floor(d.now / BS), startB = nowB - (N - 1);
+    var YMIN = 300, YMAX = 800;
+    var X = function(k){ return L + pw * k / (N - 1); };
+    var Y = function(v){ v = Math.max(YMIN, Math.min(YMAX, v)); return T + ph * (1 - (v - YMIN) / (YMAX - YMIN)); };
+    heatGeo = { L:L, pw:pw, N:N, startB:startB, BS:BS, W:W };
+    var mono = 'font-family:var(--mono);font-size:11px;';
+    var s = '';
+    for (var v = YMIN; v <= YMAX; v += 100) {
+      var yy = Y(v).toFixed(1);
+      s += '<line x1="' + L + '" x2="' + (L + pw) + '" y1="' + yy + '" y2="' + yy + '" style="stroke:var(--border)"/>';
+      s += '<text x="' + (L - 8) + '" y="' + (Y(v) + 4).toFixed(1) + '" text-anchor="end" style="' + mono + 'fill:var(--text-muted)">' + (v / 10) + '</text>';
+    }
+    var step = narrow ? 21600 : 10800;   /* every 6 h on a phone, 3 h otherwise */
+    for (var k = 0; k < N; k++) {
+      var u = (startB + k) * BS;
+      if (u % step !== 0) continue;
+      var xx = X(k).toFixed(1);
+      s += '<line x1="' + xx + '" x2="' + xx + '" y1="' + (T + ph) + '" y2="' + (T + ph + 5) + '" style="stroke:var(--text-muted)"/>';
+      s += '<text x="' + xx + '" y="' + (H - 6) + '" text-anchor="middle" style="' + mono + 'fill:var(--text-muted)">' + heatHour(Math.floor(u / 3600) % 24) + '</text>';
+    }
+    (d.nodes || []).forEach(function(node, i){
+      var arr = node[heatStat] || [], path = '', pen = false, last = -1;
+      for (var k = 0; k < N; k++) {
+        var v = arr[k];
+        if (v == null) { pen = false; continue; }
+        path += (pen ? 'L' : 'M') + X(k).toFixed(1) + ' ' + Y(v).toFixed(1);
+        pen = true; last = k;
+      }
+      if (!path) return;
+      s += '<path d="' + path + '" fill="none" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" style="stroke:' + HEAT[i] + '"/>';
+      s += '<circle cx="' + X(last).toFixed(1) + '" cy="' + Y(arr[last]).toFixed(1) + '" r="2.6" style="fill:' + HEAT[i] + '"/>';
+    });
+    s += '<line id="heat-cursor" y1="' + T + '" y2="' + (T + ph) + '" x1="0" x2="0" style="stroke:var(--text-dim);stroke-dasharray:3 3;display:none"/>';
+    heatSvg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    heatSvg.setAttribute('width', W);
+    heatSvg.setAttribute('height', H);
+    heatSvg.innerHTML = s;
+    $('heat-legend').innerHTML = (d.nodes || []).map(function(n, i){
+      return '<span><i style="background:' + HEAT[i] + '"></i>' + n.name + '</span>';
+    }).join('');
+    var note = $('heat-note');
+    if (d.clock === false) {
+      note.firstChild.textContent = 'The blade serving you has no clock yet, so it has nothing to file a reading under. The chart fills once the fleet hands it the time. ';
+    }
+  }
+
+  /* the hover layer: one bucket's six readings, with its UTC time */
+  function heatHover(ev){
+    var g = heatGeo, d = heatData;
+    if (!g || !d) return;
+    var rect = heatSvg.getBoundingClientRect();
+    var px = (ev.touches ? ev.touches[0].clientX : ev.clientX) - rect.left;
+    var sx = px * g.W / rect.width;                        /* css px -> viewBox units */
+    var k = Math.round((sx - g.L) / g.pw * (g.N - 1));
+    if (k < 0 || k >= g.N) { heatLeave(); return; }
+    var x = g.L + g.pw * k / (g.N - 1);
+    var cur = heatSvg.querySelector('#heat-cursor');
+    if (cur) { cur.setAttribute('x1', x); cur.setAttribute('x2', x); cur.style.display = ''; }
+    var u = (g.startB + k) * g.BS, t = new Date(u * 1000);
+    var html = '<b>' + heatPad(t.getUTCHours()) + ':' + heatPad(t.getUTCMinutes()) + ' utc</b> &middot; ' + heatStat;
+    (d.nodes || []).forEach(function(n, i){
+      var v = (n[heatStat] || [])[k];
+      html += '<br><i style="background:' + HEAT[i] + '"></i>' + n.name + ' <b>' + (v == null ? '&mdash;' : (v / 10).toFixed(1) + '&deg;') + '</b>';
+    });
+    heatTip.innerHTML = html;
+    heatTip.hidden = false;
+    var tipW = heatTip.offsetWidth, cssX = x * rect.width / g.W + (rect.left - heatPlot.getBoundingClientRect().left);
+    var flip = cssX + tipW + 24 > heatPlot.clientWidth;
+    heatTip.style.left = (flip ? cssX - tipW - 12 : cssX + 12) + 'px';
+    heatTip.style.top = '14px';
+  }
+  function heatLeave(){
+    heatTip.hidden = true;
+    var cur = heatSvg && heatSvg.querySelector('#heat-cursor');
+    if (cur) cur.style.display = 'none';
+  }
+
+  function heatOffline(){
+    if (heatEver) return;                                  /* keep the last good day on screen */
+    $('heat-legend').innerHTML = '';
+    $('heat-note').firstChild.textContent = 'The chart is only visible when this page is served by the swarm itself. You are most likely reading a copy. ';
+  }
+  function heatPoll(){
+    var ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    var killer = ctl ? setTimeout(function(){ ctl.abort(); }, 6000) : 0;
+    fetch('/temps', { cache:'no-store', signal: ctl ? ctl.signal : undefined })
+      .then(function(r){ if(!r.ok) throw new Error('http ' + r.status); return r.json(); })
+      .then(function(d){ clearTimeout(killer); heatData = d; heatEver = true; heatRender(); })
+      .catch(function(){ clearTimeout(killer); heatOffline(); });
+  }
+  var HEAT_MS = 60000, lastHeat = 0;
+  function heatMaybePoll(){
+    if (document.visibilityState !== 'visible' || !onScreen()) return;
+    lastHeat = Date.now();
+    heatPoll();
+  }
+  if (heatSvg) {
+    Array.prototype.forEach.call(document.querySelectorAll('.heat-mode'), function(b){
+      b.addEventListener('click', function(){
+        heatStat = b.getAttribute('data-stat');
+        Array.prototype.forEach.call(document.querySelectorAll('.heat-mode'), function(o){ o.classList.toggle('is-on', o === b); });
+        heatRender();
+      });
+    });
+    heatSvg.addEventListener('mousemove', heatHover);
+    heatSvg.addEventListener('mouseleave', heatLeave);
+    heatSvg.addEventListener('touchstart', heatHover, { passive:true });
+    heatSvg.addEventListener('touchmove', heatHover, { passive:true });
+    heatSvg.addEventListener('touchend', heatLeave);
+    var heatResize = 0;
+    window.addEventListener('resize', function(){ clearTimeout(heatResize); heatResize = setTimeout(heatRender, 150); });
+    /* 1.5 s in, not at load: the page, its favicon, the og image and the
+       first roster poll already open four connections at once, which is the
+       fleet's whole admission ceiling for a second - a fifth gets refused. */
+    setTimeout(heatPoll, 1500);
+    setInterval(heatMaybePoll, HEAT_MS);
+  }
+
   poll();                         /* first paint, regardless of where you land */
   setInterval(maybePoll, POLL_MS);
   document.addEventListener('visibilitychange', function(){
     /* back from a background tab: the numbers on screen are stale, refresh at once */
     if (document.visibilityState === 'visible' && Date.now() - lastPoll > POLL_MS) maybePoll();
+    if (document.visibilityState === 'visible' && Date.now() - lastHeat > HEAT_MS) heatMaybePoll();
   });
 })();
 </script>

@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <strings.h>   /* strcasecmp for the redirect host allowlist */
 #include "esp_https_server.h"
 #include <netinet/tcp.h>
@@ -25,6 +26,8 @@
 #include "serve.h"
 #include "ota.h"
 #include "splice.h"  /* pairs in flight: the probe must not spend the pool's last blocks */
+#include "swarm_identity.h"   /* the ledger's names, for /temps */
+#include "thermal.h"          /* this blade's day of die temperatures */
 
 /* err_kind[] rides mid-heartbeat sized by SERVE_ERR_KINDS; if the IDF ever
  * grows httpd_err_code_t, tally() below would silently drop the new codes.
@@ -366,6 +369,72 @@ static esp_err_t roster_get_handler(httpd_req_t *req)
     swarm_record_request((uint32_t)(esp_timer_get_time() - t0));
     return r;
 }
+
+/* the ledger's name for a fleet id, as /roster reports it */
+static const char *member_name(uint8_t id)
+{
+    for (size_t i = 0; i < swarm_fleet_size(); i++) {
+        const swarm_member_t *m = swarm_member(i);
+        if (m->id == id) return m->name;
+    }
+    return "?";
+}
+
+/* GET /temps - the fleet's day of die temperatures, as THIS blade remembers
+ * it (thermal.c): six nodes x 288 five-minute buckets x max/min/avg, tenths
+ * of a degree, null where this blade heard nothing. About 25 KB, streamed one
+ * series at a time through a 1.6 KB buffer so no request ever owns 25 KB of
+ * RAM. Same gates as /roster: no body, same origin. No addresses, ever. */
+static esp_err_t temps_get_handler(httpd_req_t *req)
+{
+    if (req->content_len) {
+        tally(HTTPD_400_BAD_REQUEST);
+        sample_refusal(req, 400, false, NULL);
+        httpd_resp_set_status(req, "400 Bad Request");
+        httpd_resp_sendstr(req, "");
+        return ESP_FAIL;
+    }
+    if (!origin_is_self(req)) {
+        tally(HTTPD_403_FORBIDDEN);
+        sample_refusal(req, 403, false, NULL);
+        httpd_resp_set_status(req, "403 Forbidden");
+        httpd_resp_set_type(req, "application/json");
+        httpd_resp_sendstr(req, "{\"err\":\"cross-origin refused\"}");
+        return ESP_FAIL;
+    }
+    if (!thermal_ready()) {
+        httpd_resp_set_status(req, "503 Service Unavailable");
+        httpd_resp_sendstr(req, "");
+        return ESP_FAIL;
+    }
+    int64_t t0 = esp_timer_get_time();
+    uint32_t now_s = (uint32_t)time(NULL);
+    static char buf[1600];   /* one series at a time; this server is one task */
+    static const char *const STAT[3] = { "max", "min", "avg" };   /* bohun_temp_stat_t order */
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "X-Content-Type-Options", "nosniff");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    int n = snprintf(buf, sizeof(buf), "{\"now\":%lu,\"bucket_s\":%u,\"n\":%u,\"clock\":%s,\"nodes\":[",
+                     (unsigned long)now_s, (unsigned)BOHUN_TEMP_BUCKET_S, (unsigned)BOHUN_TEMP_BUCKETS,
+                     bohun_time_sane(now_s) ? "true" : "false");
+    if (httpd_resp_send_chunk(req, buf, n) != ESP_OK) return ESP_FAIL;
+    for (unsigned s = 0; s < BOHUN_TEMP_NODES; s++) {
+        n = snprintf(buf, sizeof(buf), "%s{\"name\":\"%s\"", s ? "," : "", member_name(bohun_temp_slot_id(s)));
+        if (httpd_resp_send_chunk(req, buf, n) != ESP_OK) return ESP_FAIL;
+        for (int st = 0; st < 3; st++) {
+            n = snprintf(buf, sizeof(buf), ",\"%s\":", STAT[st]);
+            if (httpd_resp_send_chunk(req, buf, n) != ESP_OK) return ESP_FAIL;
+            size_t len = thermal_series_json(s, (bohun_temp_stat_t)st, now_s, buf, sizeof(buf));
+            if (!len || httpd_resp_send_chunk(req, buf, len) != ESP_OK) return ESP_FAIL;
+        }
+        if (httpd_resp_send_chunk(req, "}", 1) != ESP_OK) return ESP_FAIL;
+    }
+    if (httpd_resp_send_chunk(req, "]}\n", 3) != ESP_OK) return ESP_FAIL;
+    esp_err_t r = httpd_resp_send_chunk(req, NULL, 0);
+    swarm_record_request((uint32_t)(esp_timer_get_time() - t0));
+    return r;
+}
+static const httpd_uri_t temps_uri = { .uri = "/temps", .method = HTTP_GET, .handler = temps_get_handler };
 
 static const httpd_uri_t root = { .uri = "/", .method = HTTP_GET, .handler = root_get_handler };
 static const httpd_uri_t ota = { .uri = "/ota", .method = HTTP_POST, .handler = ota_post_handler };
@@ -829,6 +898,9 @@ void serve_start(void)
      * test after changing either number. */
     pub.httpd.recv_wait_timeout  = 5;   /* internal port now - see the timeout note above */
     pub.httpd.max_open_sockets   = 8;
+    /* eight handlers would sit exactly at httpd's default; registration past
+     * the cap fails silently (the admin plane found out), so say the number */
+    pub.httpd.max_uri_handlers   = 10;
     /* TLS SESSION TICKETS. HTTPD_SSL_CONFIG_DEFAULT ships this false, and
      * without it EVERY visitor - returning ones included - pays the full
      * ~500 ms P-256 handshake (measured: session_reused=false, always). */
@@ -844,6 +916,7 @@ void serve_start(void)
         httpd_register_uri_handler(server, &robots_uri);
         clicks_load();
         httpd_register_uri_handler(server, &click_beacon);
+        httpd_register_uri_handler(server, &temps_uri);   /* the fleet's day of die temperatures */
         register_err_counters(server);
         s_ready = true;   /* only now is claiming the mask honest */
         ESP_LOGI(TAG, "public: / /roster over TLS on port %d (no /ota here)", pub.port_secure);

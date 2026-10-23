@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include <inttypes.h>
 #include <stddef.h>
+#include <time.h>
+#include <sys/time.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
@@ -107,6 +109,26 @@ typedef struct {
     int8_t rssi;
     hb_frame_t frame;
 } hb_event_t;
+
+/* THE TIME BEACON (eth v20). The blades fetch NTP (eth_main.c) and every tenth
+ * heartbeat say what time it is in a second, 16-byte frame with ITS OWN magic:
+ * an image that predates it fails the heartbeat's magic check at the door and
+ * never reads a byte, so the heartbeat stays exactly 132 bytes and nothing
+ * mid-roll misparses. The observers have no wire to any clock - this is how
+ * the kobzar knows which 5-minute UTC bucket a temperature belongs to
+ * (logic.h, the thermal history). Receivers adopt it by bohun_time_adopt. */
+typedef struct __attribute__((packed)) {
+    char     magic[4];      /* "ACLT" */
+    uint8_t  ver;           /* 1 */
+    uint8_t  node_id;
+    uint8_t  pad[2];
+    uint32_t unix_s;        /* the sender's clock, seconds since the epoch */
+    uint32_t uptime_s;      /* the sender's uptime, for the log line */
+} time_frame_t;
+_Static_assert(sizeof(time_frame_t) == 16, "time beacon layout changed - bump its ver");
+#define TIME_BEACON_EVERY  10   /* heartbeats between beacons */
+#define TIME_ADOPT_TOL_S   3    /* disagree by more than this and the beacon wins */
+static uint8_t s_clock_source;  /* id of the member whose beacon last set our clock; 0 = never */
 
 typedef struct {
     const swarm_member_t *member;
@@ -441,7 +463,10 @@ static void swarm_recv_cb(const esp_now_recv_info_t *info, const uint8_t *data, 
     /* Validate before spending a queue slot. The queue is 16 deep; without this,
      * anything able to put frames on our channel could keep it full and starve the
      * heartbeats that failover depends on. Magic + a 7-entry table walk is cheap. */
-    if (memcmp(data, "ACLD", 4) != 0 || !swarm_member_by_mac(info->src_addr)) {
+    /* two frame kinds share the door: the heartbeat, and the time beacon -
+     * which must be exactly its own size, or it is junk wearing the magic */
+    bool beacon = memcmp(data, "ACLT", 4) == 0 && len == (int)sizeof(time_frame_t);
+    if ((!beacon && memcmp(data, "ACLD", 4) != 0) || !swarm_member_by_mac(info->src_addr)) {
         s_rx_dropped++;
         return;
     }
@@ -544,6 +569,21 @@ static void swarm_hb_tx_task(void *arg)
             }
             esp_now_send(m->base_mac, (const uint8_t *)&frame, sizeof(frame));
         }
+        /* the time beacon: blades only (they have the wire and the NTP), every
+         * tenth heartbeat, and only once this clock has actually been set */
+        if (self->eligible && frame.seq % TIME_BEACON_EVERY == 0) {
+            uint32_t now_s = (uint32_t)time(NULL);
+            if (bohun_time_sane(now_s)) {
+                time_frame_t tf = { .magic = {'A', 'C', 'L', 'T'}, .ver = 1, .node_id = self->id,
+                                    .unix_s = now_s, .uptime_s = frame.uptime_s };
+                for (size_t i = 0; i < swarm_fleet_size(); i++) {
+                    const swarm_member_t *m = swarm_member(i);
+                    if (m->id != self->id) {
+                        esp_now_send(m->base_mac, (const uint8_t *)&tf, sizeof(tf));
+                    }
+                }
+            }
+        }
         vTaskDelay(pdMS_TO_TICKS(HB_PERIOD_MS));
     }
 }
@@ -623,6 +663,20 @@ static void swarm_monitor_task(void *arg)
         }
         hb_event_t ev;
         while (xQueueReceive(s_rx_queue, &ev, 0) == pdTRUE) {
+            if (memcmp(ev.frame.magic, "ACLT", 4) == 0) {   /* a time beacon, not a heartbeat */
+                time_frame_t tf;
+                memcpy(&tf, &ev.frame, sizeof(tf));
+                const swarm_member_t *src = swarm_member_by_mac(ev.src_mac);
+                if (src && tf.ver >= 1
+                    && bohun_time_adopt((uint32_t)time(NULL), tf.unix_s, TIME_ADOPT_TOL_S)) {
+                    struct timeval tv = { .tv_sec = (time_t)tf.unix_s, .tv_usec = 0 };
+                    settimeofday(&tv, NULL);
+                    s_clock_source = src->id;
+                    ESP_LOGI(TAG, "clock set from %s's beacon: %lu (its uptime %lu s)",
+                             src->name, (unsigned long)tf.unix_s, (unsigned long)tf.uptime_s);
+                }
+                continue;
+            }
             if (memcmp(ev.frame.magic, "ACLD", 4) != 0 || ev.frame.ver < 1) {
                 continue;
             }
@@ -1089,6 +1143,11 @@ int swarm_snapshot(swarm_snap_entry_t *e, int max, uint8_t *leader_out)
         n++;
     }
     return n;
+}
+
+uint8_t swarm_clock_source(void)
+{
+    return s_clock_source;
 }
 
 void swarm_start(void)

@@ -1,5 +1,5 @@
 /* bohun mission (the kobzar, 4.3"): the mission-control dashboard.
- * 800x480, LVGL 9, the site's palette, FIVE tiles (swipe right through them):
+ * 800x480, LVGL 9, the site's palette, SIX tiles (swipe right through them):
  *   tile 0 - mission control: node rows with status + served columns, the
  *            CHRONICLE, fleet-wide traffic chart (requests + p50), quorum,
  *            fleet availability, reign records, RELEASE progress on rows.
@@ -9,7 +9,9 @@
  *            fleet's refusals by kind as bars, the live per-minute rate.
  *   tile 3 - CONVERSIONS: the click table per blade, fleet sum, and the
  *            kobzar's own NVS archive of what wiped blades forgot.
- *   tile 4 - THE RADIO: the gossip tail, every heartbeat heard in the last
+ *   tile 4 - TEMPERATURE: the rack's six dies over the last 24 hours in
+ *            5-minute UTC buckets - max, min or average per node on a tap.
+ *   tile 5 - THE RADIO: the gossip tail, every heartbeat heard in the last
  *            45 s with rssi, seq and missed-frame markers.
  * (A sixth tile rendered the served page itself from a 12 MB RGB565 strip in
  *  its own partition; retired in v12 - the partition stays in the table.)
@@ -21,6 +23,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
+#include <time.h>
+#include <assert.h>
 #include "esp_lvgl_port.h"
 #include "esp_timer.h"
 #include "esp_system.h"   /* esp_reset_reason - the kobzar states its own boot cause */
@@ -31,7 +35,9 @@
 #include "ui.h"
 #include "ota_window.h"
 #include "esp_app_desc.h"
-#include "logic.h"   /* the rate ring + counter deltas, host-tested */
+#include "logic.h"   /* the rate ring, counter deltas, the thermal history - host-tested */
+#include "esp_heap_caps.h"   /* the thermal history lives in PSRAM */
+#include "swarm_identity.h"  /* legend names straight from the ledger */
 
 #define C_BG     0x0a0a0c
 #define C_CARD   0x111115
@@ -93,6 +99,34 @@ static lv_obj_t *s_conv_lbl;
 static uint32_t s_conv_base[SERVE_CLICK_KINDS];
 static uint16_t s_conv_last[8][SERVE_CLICK_KINDS];
 static nvs_handle_t s_conv_nvs;
+/* ---- TEMPERATURE (tile 4) ----
+ * Every heartbeat carries a die temperature; the kobzar folds each one into
+ * logic.h's thermal history (5-minute UTC buckets, 24 h, per node) and draws
+ * the fleet's day as six lines. The clock comes from the blades' time beacon
+ * (swarm.c) - until the first one lands there is no UTC to bucket by, and the
+ * tile says so instead of inventing an axis. Zero is the word for "nobody
+ * heard this node in this bucket", by the owner's rule. */
+#define TEMP_XTICKS_MAX 9                /* 3-hourly marks across 24 h: 8, or 9 when both edges align */
+#define TEMP_Y_MIN_C10  300              /* the axis is fixed, 30..80 C: the die sensor's own range tops out at 80 */
+#define TEMP_Y_MAX_C10  800
+#define TEMP_Y_LABELS   6                /* 30, 40 .. 80 */
+#define TEMP_REDRAW_S   10
+#define TEMP_CARD_Y     72
+#define TEMP_CH_X       46               /* inside the card: the Y labels sit left of this */
+#define TEMP_CH_Y       30
+#define TEMP_CH_W       718
+#define TEMP_CH_H       264
+static const uint32_t TEMP_COLOR[BOHUN_TEMP_NODES] = {
+    0x14b8a6, 0xd95926, 0xe2b53a, 0x6366f1,   /* blades: teal, orange, gold, indigo */
+    0xc084fc, 0xe8e6e3,                       /* the pysar lavender; the kobzar draws itself in the text colour */
+};
+static bohun_temp_hist_t *s_temp_hist;           /* 22 KB, PSRAM */
+static int32_t *s_temp_y[BOHUN_TEMP_NODES];      /* the chart's point arrays, PSRAM */
+static lv_obj_t *s_temp_chart, *s_temp_cap, *s_temp_clock, *s_temp_btn[3];
+static lv_obj_t *s_temp_xlbl[TEMP_XTICKS_MAX];
+static lv_chart_series_t *s_temp_ser[BOHUN_TEMP_NODES];
+static bohun_temp_stat_t s_temp_stat = BOHUN_TEMP_AVG;
+static uint32_t s_temp_drawn_s;                  /* unix time of the last redraw; 0 = never */
 static lv_obj_t *s_avail_lbl;
 static lv_obj_t *s_radio_sum, *s_radio_lbl;   /* tile 2: the gossip tail */
 
@@ -446,6 +480,95 @@ static void wake_cb(lv_event_t *ev)
 
 /* ---------- build ---------- */
 
+/* ---------- TEMPERATURE: the fleet's day on glass ---------- */
+
+/* the ledger's own word for a member: shortname for a blade, role for a witness */
+static const char *temp_node_name(uint8_t id)
+{
+    for (size_t i = 0; i < swarm_fleet_size(); i++) {
+        const swarm_member_t *m = swarm_member(i);
+        if (m->id != id) continue;
+        if (!m->eligible && m->witness_role) return m->witness_role;
+        return m->shortname;
+    }
+    return "?";
+}
+
+static const char *temp_stat_word(bohun_temp_stat_t st)
+{
+    return st == BOHUN_TEMP_MAX ? "MAX" : st == BOHUN_TEMP_MIN ? "MIN" : "AVERAGE";
+}
+
+/* Redraw the tile from the history: six series over the window ending now,
+ * on the fixed 30..80 C axis (a zero - no reading - clamps to the floor), the
+ * hour marks where the clock puts them. Called under the LVGL lock. */
+static void temp_render(uint32_t now_s)
+{
+    uint32_t start = bohun_temp_window_start(now_s);
+    for (int i = 0; i < BOHUN_TEMP_NODES; i++) {
+        for (int k = 0; k < BOHUN_TEMP_BUCKETS; k++) {
+            s_temp_y[i][k] = bohun_temp_value(s_temp_hist, (unsigned)i, start + (uint32_t)k, s_temp_stat);
+        }
+    }
+    lv_chart_refresh(s_temp_chart);
+
+    uint16_t idx[TEMP_XTICKS_MAX];
+    uint8_t hour[TEMP_XTICKS_MAX];
+    int nt = bohun_temp_ticks(now_s, 3, idx, hour, TEMP_XTICKS_MAX);
+    for (int i = 0; i < TEMP_XTICKS_MAX; i++) {
+        if (i >= nt) {
+            lv_obj_add_flag(s_temp_xlbl[i], LV_OBJ_FLAG_HIDDEN);
+            continue;
+        }
+        char hl[8];
+        bohun_hour_label(hour[i], hl, sizeof(hl));
+        lv_label_set_text(s_temp_xlbl[i], hl);
+        lv_obj_remove_flag(s_temp_xlbl[i], LV_OBJ_FLAG_HIDDEN);
+        /* the chart spreads its points over the width, first on the left edge */
+        int x = TEMP_CH_X + (int)(((int32_t)TEMP_CH_W * idx[i]) / (BOHUN_TEMP_BUCKETS - 1)) - 20;
+        lv_obj_set_pos(s_temp_xlbl[i], x < TEMP_CH_X - 16 ? TEMP_CH_X - 16 : x, TEMP_CH_Y + TEMP_CH_H + 4);
+    }
+    lv_label_set_text_fmt(s_temp_cap, "LAST 24 HOURS - %s die temperature per 5-minute bucket, C - a bucket with no reading sits on the floor",
+                          temp_stat_word(s_temp_stat));
+    s_temp_drawn_s = now_s;
+}
+
+static void temp_set_mode(bohun_temp_stat_t st)
+{
+    s_temp_stat = st;
+    for (int i = 0; i < 3; i++) {   /* the buttons are created in enum order */
+        bool on = (bohun_temp_stat_t)i == st;
+        if (on) lv_obj_add_state(s_temp_btn[i], LV_STATE_CHECKED);
+        else    lv_obj_remove_state(s_temp_btn[i], LV_STATE_CHECKED);
+        lv_obj_set_style_text_color(lv_obj_get_child(s_temp_btn[i], 0), lv_color_hex(on ? C_BG : C_DIM), 0);
+    }
+}
+
+static void temp_mode_cb(lv_event_t *ev)
+{
+    temp_set_mode((bohun_temp_stat_t)(intptr_t)lv_event_get_user_data(ev));
+    uint32_t now_s = (uint32_t)time(NULL);
+    if (bohun_time_sane(now_s)) temp_render(now_s);
+}
+
+static lv_obj_t *mk_mode_btn(lv_obj_t *parent, int x, const char *txt, bohun_temp_stat_t st)
+{
+    lv_obj_t *b = lv_button_create(parent);
+    lv_obj_set_pos(b, x, 10);
+    lv_obj_set_size(b, 96, 40);   /* a thumb's worth - the first cut was 68x30 and fiddly */
+    lv_obj_set_style_radius(b, 4, 0);
+    lv_obj_set_style_shadow_width(b, 0, 0);
+    lv_obj_set_style_bg_color(b, lv_color_hex(C_CARD2), 0);
+    lv_obj_set_style_border_color(b, lv_color_hex(C_BORDER), 0);
+    lv_obj_set_style_border_width(b, 1, 0);
+    lv_obj_set_style_bg_color(b, lv_color_hex(C_LIME), LV_STATE_CHECKED);
+    lv_obj_set_style_border_color(b, lv_color_hex(C_LIME), LV_STATE_CHECKED);
+    lv_obj_t *l = mk_label(b, 0, 0, &lv_font_montserrat_20, C_DIM, txt);
+    lv_obj_center(l);
+    lv_obj_add_event_cb(b, temp_mode_cb, LV_EVENT_CLICKED, (void *)(intptr_t)st);
+    return b;
+}
+
 void ui_init(lv_display_t *disp)
 {
     (void)disp;
@@ -456,7 +579,7 @@ void ui_init(lv_display_t *disp)
     lv_obj_set_style_bg_color(scr, lv_color_hex(C_BG), 0);
     lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
 
-    /* ---- five tiles: mission control | the ledger | refusals | conversions | the radio ---- */
+    /* ---- six tiles: mission control | the ledger | refusals | conversions | temperature | the radio ---- */
     lv_obj_t *tv = lv_tileview_create(scr);
     lv_obj_set_size(tv, 800, 480);
     lv_obj_set_style_bg_opa(tv, LV_OPA_TRANSP, 0);
@@ -465,7 +588,8 @@ void ui_init(lv_display_t *disp)
     lv_obj_t *tile_err   = lv_tileview_add_tile(tv, 1, 0, LV_DIR_LEFT | LV_DIR_RIGHT);
     lv_obj_t *tile_ref   = lv_tileview_add_tile(tv, 2, 0, LV_DIR_LEFT | LV_DIR_RIGHT);
     lv_obj_t *tile_conv  = lv_tileview_add_tile(tv, 3, 0, LV_DIR_LEFT | LV_DIR_RIGHT);
-    lv_obj_t *tile_radio = lv_tileview_add_tile(tv, 4, 0, LV_DIR_LEFT);
+    lv_obj_t *tile_temp  = lv_tileview_add_tile(tv, 4, 0, LV_DIR_LEFT | LV_DIR_RIGHT);
+    lv_obj_t *tile_radio = lv_tileview_add_tile(tv, 5, 0, LV_DIR_LEFT);
 
     /* ---- tile 1: the refusal ledger --------------------------------------
      * Availability says how much we turned away; this says WHAT. Deliberately
@@ -580,9 +704,9 @@ void ui_init(lv_display_t *disp)
         lv_label_set_recolor(s_ref_kind_vals, true);
     }
     mk_label(tile_ref, 16, 444, &lv_font_montserrat_14, C_MUTED,
-             "swipe right for conversions, then the radio - left for the ledger");
+             "swipe right for conversions, then temperature and the radio - left for the ledger");
 
-    /* ---- tile 4: THE RADIO - the gossip tail ---------------------------- */
+    /* ---- tile 5: THE RADIO - the gossip tail ---------------------------- */
     mk_label(tile_radio, 16, 12, &lv_font_montserrat_28, C_LIME, "THE RADIO");
     mk_label(tile_radio, 16, 46, &lv_font_montserrat_14, C_DIM,
              "every heartbeat heard - esp-now, encrypted, 1 Hz per member");
@@ -596,7 +720,75 @@ void ui_init(lv_display_t *disp)
     lv_label_set_long_mode(s_radio_lbl, LV_LABEL_LONG_CLIP);
     lv_obj_set_width(s_radio_lbl, 748);
     mk_label(tile_radio, 16, 444, &lv_font_montserrat_14, C_MUTED,
-             "the last tile - swipe left for conversions");
+             "the last tile - swipe left for temperature");
+
+    /* ---- tile 4: TEMPERATURE - every die, the last 24 hours, 5-minute buckets ---- */
+    mk_label(tile_temp, 16, 12, &lv_font_montserrat_28, C_LIME, "TEMPERATURE");
+    mk_label(tile_temp, 16, 46, &lv_font_montserrat_14, C_DIM,
+             "every die in the rack - 24 hours, 5-minute buckets, UTC");
+    s_temp_btn[BOHUN_TEMP_MAX] = mk_mode_btn(tile_temp, 440, "max", BOHUN_TEMP_MAX);
+    s_temp_btn[BOHUN_TEMP_MIN] = mk_mode_btn(tile_temp, 556, "min", BOHUN_TEMP_MIN);
+    s_temp_btn[BOHUN_TEMP_AVG] = mk_mode_btn(tile_temp, 672, "avg", BOHUN_TEMP_AVG);
+    temp_set_mode(BOHUN_TEMP_AVG);
+    s_temp_clock = mk_label(tile_temp, 400, 54, &lv_font_montserrat_14, C_DIM,
+                            "no clock yet - waiting for a blade's time beacon");
+    lv_obj_set_width(s_temp_clock, 384);
+    lv_obj_set_style_text_align(s_temp_clock, LV_TEXT_ALIGN_RIGHT, 0);
+    {
+        s_temp_hist = heap_caps_calloc(1, sizeof(*s_temp_hist), MALLOC_CAP_SPIRAM);
+        assert(s_temp_hist);
+        lv_obj_t *card = mk_card(tile_temp, 12, TEMP_CARD_Y, 776, 364);
+        s_temp_cap = mk_label(card, 10, 8, &lv_font_montserrat_14, C_DIM, "LAST 24 HOURS");
+        s_temp_chart = lv_chart_create(card);
+        lv_obj_set_pos(s_temp_chart, TEMP_CH_X, TEMP_CH_Y);
+        lv_obj_set_size(s_temp_chart, TEMP_CH_W, TEMP_CH_H);
+        lv_chart_set_type(s_temp_chart, LV_CHART_TYPE_LINE);
+        lv_chart_set_point_count(s_temp_chart, BOHUN_TEMP_BUCKETS);
+        lv_chart_set_range(s_temp_chart, LV_CHART_AXIS_PRIMARY_Y, TEMP_Y_MIN_C10, TEMP_Y_MAX_C10);
+        lv_chart_set_div_line_count(s_temp_chart, TEMP_Y_LABELS, 0);   /* a faint line per 10 C, edges included */
+        lv_obj_set_style_bg_color(s_temp_chart, lv_color_hex(C_CARD2), 0);
+        lv_obj_set_style_border_width(s_temp_chart, 0, 0);
+        lv_obj_set_style_pad_all(s_temp_chart, 0, LV_PART_MAIN);   /* points span the full width: the marks below assume it */
+        lv_obj_set_style_line_color(s_temp_chart, lv_color_hex(C_BORDER), LV_PART_MAIN);
+        lv_obj_set_style_size(s_temp_chart, 0, 0, LV_PART_INDICATOR);   /* no point markers - 1728 of them would be a haze */
+        lv_obj_set_style_line_width(s_temp_chart, 2, LV_PART_ITEMS);
+        for (int i = 0; i < BOHUN_TEMP_NODES; i++) {
+            s_temp_y[i] = heap_caps_calloc(BOHUN_TEMP_BUCKETS, sizeof(int32_t), MALLOC_CAP_SPIRAM);
+            assert(s_temp_y[i]);
+            s_temp_ser[i] = lv_chart_add_series(s_temp_chart, lv_color_hex(TEMP_COLOR[i]), LV_CHART_AXIS_PRIMARY_Y);
+            lv_chart_set_series_ext_y_array(s_temp_chart, s_temp_ser[i], s_temp_y[i]);
+        }
+        for (int i = 0; i < TEMP_Y_LABELS; i++) {   /* 30 .. 80, one per division line, in whole degrees */
+            int32_t v = TEMP_Y_MIN_C10 + i * 100;
+            int y = TEMP_CH_Y + TEMP_CH_H
+                    - (int)(((int64_t)TEMP_CH_H * (v - TEMP_Y_MIN_C10)) / (TEMP_Y_MAX_C10 - TEMP_Y_MIN_C10)) - 8;
+            lv_obj_t *yl = mk_label(card, TEMP_CH_X - 38, y, &lv_font_montserrat_14, C_MUTED, "");
+            lv_label_set_text_fmt(yl, "%ld", (long)(v / 10));
+            lv_obj_set_width(yl, 30);
+            lv_obj_set_style_text_align(yl, LV_TEXT_ALIGN_RIGHT, 0);
+        }
+        for (int i = 0; i < TEMP_XTICKS_MAX; i++) {
+            s_temp_xlbl[i] = mk_label(card, TEMP_CH_X, TEMP_CH_Y + TEMP_CH_H + 4, &lv_font_montserrat_14, C_MUTED, "");
+            lv_obj_set_width(s_temp_xlbl[i], 40);
+            lv_obj_set_style_text_align(s_temp_xlbl[i], LV_TEXT_ALIGN_CENTER, 0);
+            lv_obj_add_flag(s_temp_xlbl[i], LV_OBJ_FLAG_HIDDEN);
+        }
+        vTaskDelay(1);   /* let IDLE breathe - the ledger tile learned this the hard way */
+        /* the legend: a swatch and the ledger's own name per node */
+        for (int i = 0; i < BOHUN_TEMP_NODES; i++) {
+            int x = TEMP_CH_X + i * 118;
+            lv_obj_t *sw = lv_obj_create(card);
+            lv_obj_set_pos(sw, x, 334);
+            lv_obj_set_size(sw, 12, 12);
+            lv_obj_set_style_bg_color(sw, lv_color_hex(TEMP_COLOR[i]), 0);
+            lv_obj_set_style_border_width(sw, 0, 0);
+            lv_obj_set_style_radius(sw, 2, 0);
+            lv_obj_remove_flag(sw, LV_OBJ_FLAG_SCROLLABLE);
+            mk_label(card, x + 18, 330, &lv_font_montserrat_14, C_DIM, temp_node_name(bohun_temp_slot_id((unsigned)i)));
+        }
+    }
+    mk_label(tile_temp, 16, 444, &lv_font_montserrat_14, C_MUTED,
+             "swipe right for the radio - left for conversions");
 
     /* ---- tile 3: the conversions ledger (fourth in swipe order) ---- */
     mk_label(tile_conv, 16, 12, &lv_font_montserrat_28, C_LIME, "CONVERSIONS");
@@ -783,7 +975,7 @@ void ui_init(lv_display_t *disp)
 
     /* ---- tile 0: footer = the blank switch ---- */
     lv_obj_t *foot = mk_label(s_tile0, 12, FOOT_Y + 4, &lv_font_montserrat_14, C_MUTED,
-                              "tap - screen off    hold the flag 4s - ota    swipe left - ledger, clicks, radio, the page    " __DATE__);
+                              "tap - screen off    hold the flag 4s - ota    swipe left - ledger, refusals, clicks, temps, radio    " __DATE__);
     lv_obj_set_width(foot, 776);
     lv_obj_add_flag(foot, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_set_ext_click_area(foot, 10);
@@ -1358,7 +1550,33 @@ void ui_update(const swarm_snap_entry_t *e, int n, uint8_t leader_id)
         lv_label_set_text(s_ref_kind_vals, vals);
     }
 
-    /* ---- tile 4: the gossip tail, newest first, 45 s window ---- */
+    /* ---- tile 4: TEMPERATURE - fold every die reading into its UTC bucket ---- */
+    {
+        uint32_t now_s = (uint32_t)time(NULL);
+        if (bohun_time_sane(now_s)) {
+            for (int i = 0; i < n; i++) {
+                /* a lost node's last word is not a reading - it would replay for hours */
+                if (!s[i].alive || s[i].temp_c10 == VITALS_TEMP_NONE) continue;
+                int slot = bohun_temp_slot(s[i].id);
+                if (slot >= 0) bohun_temp_record(s_temp_hist, (unsigned)slot, now_s, s[i].temp_c10);
+            }
+            if (now_s - s_temp_drawn_s >= TEMP_REDRAW_S) {
+                temp_render(now_s);
+                struct tm tm;
+                time_t t = (time_t)now_s;
+                gmtime_r(&t, &tm);
+                uint8_t src = swarm_clock_source();
+                if (src) lv_label_set_text_fmt(s_temp_clock, "%02d:%02d UTC - clock from %s's beacon",
+                                               tm.tm_hour, tm.tm_min, temp_node_name(src));
+                else     lv_label_set_text_fmt(s_temp_clock, "%02d:%02d UTC - clock kept from the last boot",
+                                               tm.tm_hour, tm.tm_min);
+            }
+        } else {
+            lv_label_set_text(s_temp_clock, "no clock yet - waiting for a blade's time beacon");
+        }
+    }
+
+    /* ---- tile 5: the gossip tail, newest first, 45 s window ---- */
     {
         #define RADIO_SHOW 19   /* 19 x 18 px = 342, inside the 364 px card */
         static swarm_radio_evt_t tail[64];

@@ -481,3 +481,200 @@ static inline uint16_t bohun_err_status(unsigned idx)
     return idx < BOHUN_ERR_KINDS ? t[idx] : 0;
 }
 
+/* THE FLEET'S CLOCK. The blades are the only members with a wire to the
+ * internet, so they fetch NTP and gossip it in a 16-byte time beacon with its
+ * own magic (swarm.c): an image that predates it fails the heartbeat's magic
+ * check at the door and never reads a byte. A receiver adopts a beacon when
+ * its own clock is unset, or disagrees by more than a tolerance - never for
+ * jitter inside it, so a bucket edge cannot wander with the radio. "Unset" is
+ * anything before BOHUN_TIME_SANE_S: an ESP32 boots in 1970 and counts up from
+ * there, which no clock that was ever set can read. */
+#define BOHUN_TIME_SANE_S 1700000000u   /* 2023-11-14: the fleet did not exist yet */
+
+static inline bool bohun_time_sane(uint32_t unix_s)
+{
+    return unix_s >= BOHUN_TIME_SANE_S;
+}
+
+static inline bool bohun_time_adopt(uint32_t local_s, uint32_t remote_s, uint32_t tol_s)
+{
+    if (!bohun_time_sane(remote_s)) {
+        return false;                    /* the sender's clock is unset too */
+    }
+    if (!bohun_time_sane(local_s)) {
+        return true;
+    }
+    uint32_t d = local_s > remote_s ? local_s - remote_s : remote_s - local_s;
+    return d > tol_s;
+}
+
+/* THE THERMAL HISTORY. The heartbeat says what every die reads NOW; nothing
+ * said what it read at 3am. The kobzar folds each reading into the 5-minute
+ * UTC bucket it belongs to - count, sum, min, max per node - and keeps the
+ * last 24 hours of buckets in a ring keyed by the ABSOLUTE bucket number
+ * (unix / 300). A slot is trusted only while its key matches the bucket asked
+ * for, so a reused slot, a clock jump and a bucket nobody heard all read as
+ * zero - the glass's word for "no reading". Buckets are wall-clock aligned,
+ * which puts a bucket edge on every round hour. Six nodes: the rack's four
+ * blades and both observers. */
+#define BOHUN_TEMP_NODES    6
+#define BOHUN_TEMP_BUCKETS  288          /* 24 h of 5-minute buckets */
+#define BOHUN_TEMP_BUCKET_S 300
+
+typedef struct {
+    int32_t  sum;                        /* tenths of a degree, summed */
+    uint16_t n;                          /* readings folded in; 0 = nobody heard */
+    int16_t  min, max;
+} bohun_temp_cell_t;
+
+typedef struct {
+    uint32_t          key[BOHUN_TEMP_BUCKETS];                     /* the absolute bucket each slot holds */
+    bohun_temp_cell_t cell[BOHUN_TEMP_NODES][BOHUN_TEMP_BUCKETS];
+} bohun_temp_hist_t;
+
+typedef enum { BOHUN_TEMP_MAX, BOHUN_TEMP_MIN, BOHUN_TEMP_AVG } bohun_temp_stat_t;
+
+static inline uint32_t bohun_temp_bucket(uint32_t unix_s)
+{
+    return unix_s / BOHUN_TEMP_BUCKET_S;
+}
+
+/* Fold one reading in. Refuses an unset clock: 1970 would key the slots as
+ * buckets 0..287 and the first real sync would then find a day of ghosts. */
+static inline bool bohun_temp_record(bohun_temp_hist_t *h, unsigned node,
+                                     uint32_t unix_s, int16_t c10)
+{
+    if (node >= BOHUN_TEMP_NODES || !bohun_time_sane(unix_s)) {
+        return false;
+    }
+    uint32_t b = bohun_temp_bucket(unix_s);
+    unsigned slot = b % BOHUN_TEMP_BUCKETS;
+    if (h->key[slot] != b) {             /* the slot's day is over: fresh for every node */
+        for (unsigned i = 0; i < BOHUN_TEMP_NODES; i++) {
+            h->cell[i][slot] = (bohun_temp_cell_t){ 0 };
+        }
+        h->key[slot] = b;
+    }
+    bohun_temp_cell_t *c = &h->cell[node][slot];
+    if (c->n == 0) {
+        c->sum = c10;
+        c->min = c->max = c10;
+    } else {
+        c->sum += c10;
+        if (c10 < c->min) c->min = c10;
+        if (c10 > c->max) c->max = c10;
+    }
+    c->n++;                              /* 300 a bucket at 1 Hz - nowhere near the type */
+    return true;
+}
+
+/* One bucket's statistic, tenths of a degree; 0 when nobody heard that node
+ * in that bucket, or the slot has since moved on to another day. */
+static inline int16_t bohun_temp_value(const bohun_temp_hist_t *h, unsigned node,
+                                       uint32_t bucket, bohun_temp_stat_t stat)
+{
+    unsigned slot = bucket % BOHUN_TEMP_BUCKETS;
+    if (node >= BOHUN_TEMP_NODES || h->key[slot] != bucket) {
+        return 0;
+    }
+    const bohun_temp_cell_t *c = &h->cell[node][slot];
+    if (c->n == 0) {
+        return 0;
+    }
+    switch (stat) {
+    case BOHUN_TEMP_MAX: return c->max;
+    case BOHUN_TEMP_MIN: return c->min;
+    default:             return (int16_t)(c->sum / (int32_t)c->n);
+    }
+}
+
+/* The window the glass shows: the 288 buckets ending with the one now_s is in. */
+static inline uint32_t bohun_temp_window_start(uint32_t now_s)
+{
+    return bohun_temp_bucket(now_s) - (BOHUN_TEMP_BUCKETS - 1);
+}
+
+/* Where the hour marks go: the window indices that begin a round step_h-hour
+ * UTC mark, each with the hour of day (0-23) it names. 300 divides 3600, so a
+ * mark is always a bucket edge. Returns the count written, at most max. */
+static inline int bohun_temp_ticks(uint32_t now_s, unsigned step_h,
+                                   uint16_t *idx, uint8_t *hour, int max)
+{
+    uint32_t start = bohun_temp_window_start(now_s);
+    uint32_t step_s = step_h * 3600u;
+    int n = 0;
+    for (unsigned k = 0; k < BOHUN_TEMP_BUCKETS && n < max; k++) {
+        uint32_t unix_s = (start + k) * BOHUN_TEMP_BUCKET_S;
+        if (unix_s % step_s == 0) {
+            idx[n] = (uint16_t)k;
+            hour[n] = (uint8_t)((unix_s / 3600u) % 24u);
+            n++;
+        }
+    }
+    return n;
+}
+
+/* "12am" .. "11pm": a mark on the glass has 40 px, not room for "00:00 UTC". */
+static inline void bohun_hour_label(unsigned hour, char *out, size_t cap)
+{
+    hour %= 24u;
+    unsigned h12 = hour % 12u ? hour % 12u : 12u;
+    snprintf(out, cap, "%u%s", h12, hour < 12u ? "am" : "pm");
+}
+
+/* The six the rack holds, in the order every glass and the page draw them:
+ * the four blades, then the pysar, then the kobzar. WS (id 5) is the shelf
+ * spare and has no line. slot <-> fleet id, -1 / 0 for anything else. */
+static inline int bohun_temp_slot(uint8_t id)
+{
+    switch (id) {
+    case 1: return 0;
+    case 2: return 1;
+    case 3: return 2;
+    case 4: return 3;
+    case 6: return 4;
+    case 7: return 5;
+    default: return -1;
+    }
+}
+
+static inline uint8_t bohun_temp_slot_id(unsigned slot)
+{
+    static const uint8_t ids[BOHUN_TEMP_NODES] = { 1, 2, 3, 4, 6, 7 };
+    return slot < BOHUN_TEMP_NODES ? ids[slot] : 0;
+}
+
+/* One node's statistic over the window ending at now_s, as a JSON array:
+ * integers in tenths of a degree, null where nobody heard. The page draws a
+ * null as a gap in the line, never as a number. Returns the length written,
+ * or 0 when the array does not fit - the caller sizes out[] for the worst
+ * case (288 x "null," + brackets = 1442), so 0 is a bug, not a truncation. */
+static inline size_t bohun_temp_json_series(const bohun_temp_hist_t *h, unsigned node,
+                                            uint32_t now_s, bohun_temp_stat_t stat,
+                                            char *out, size_t cap)
+{
+    uint32_t start = bohun_temp_window_start(now_s);
+    size_t len = 0;
+    if (cap < 3) {
+        return 0;
+    }
+    out[len++] = '[';
+    for (unsigned k = 0; k < BOHUN_TEMP_BUCKETS; k++) {
+        uint32_t b = start + k;
+        unsigned slot = b % BOHUN_TEMP_BUCKETS;
+        bool heard = node < BOHUN_TEMP_NODES && h->key[slot] == b && h->cell[node][slot].n != 0;
+        int n = heard ? snprintf(out + len, cap - len, "%s%d", k ? "," : "",
+                                 (int)bohun_temp_value(h, node, b, stat))
+                      : snprintf(out + len, cap - len, "%snull", k ? "," : "");
+        if (n < 0 || (size_t)n >= cap - len) {
+            return 0;
+        }
+        len += (size_t)n;
+    }
+    if (cap - len < 2) {
+        return 0;
+    }
+    out[len++] = ']';
+    out[len] = '\0';
+    return len;
+}

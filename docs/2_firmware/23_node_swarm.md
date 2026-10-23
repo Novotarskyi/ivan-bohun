@@ -83,6 +83,21 @@ Two side products of the TX loop:
 Consumers: the election, the public `/roster` JSON (which never carries
 addresses - the admin variant adds them), and both observers.
 
+## Time beacon
+
+The observers have no wire to any clock, and the kobzar's TEMPERATURE tile
+buckets readings by UTC. So the blades - the only members with a route to the
+internet - fetch NTP at boot (`esp_netif_sntp`, hourly thereafter) and, every
+tenth heartbeat, send a second frame: **16 bytes, magic `ACLT`**, carrying the
+sender's clock and uptime. It has its own magic on purpose: an image that
+predates it fails the heartbeat's `ACLD` check at the door and never reads a
+byte, so the heartbeat stays exactly 132 bytes and a mixed fleet mid-roll
+cannot misparse anything. A receiver adopts a beacon only when its own clock
+is unset (an ESP32 boots in 1970) or disagrees by more than three seconds -
+jitter inside that never moves a bucket edge (`bohun_time_adopt`, host-tested).
+Blades adopt too, so a blade whose DNS is unreachable still learns the time
+from its peers; the observers never send one.
+
 ## Election
 
 Deterministic arithmetic, no consensus protocol: **the lowest fleet id that

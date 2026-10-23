@@ -60,6 +60,7 @@ picked, so it cannot identify a blade.
 | backend | `GET /` | the page, br or gz, ETag + 304, build/page stamps |
 | | `GET /favicon.ico` | br / gz / identity, 1-week cache |
 | | `GET /roster` | live fleet JSON - **no addresses, ever**; cross-origin refused; `no-store` |
+| | `GET /temps` | the last 24 h of every member's die temperature in 5-minute buckets (max / min / avg, tenths, `null` = this blade heard nothing), as this blade remembers it (`thermal.c`, the same ring the kobzar draws, in PSRAM); ~25 KB streamed in 1.6 KB chunks; same gates as `/roster` |
 | | `GET /og.png`, `/llms.txt`, `/robots.txt` | static, hard-cached |
 | 8443 | `POST /ota` | key-gated, fail-closed variant guard, trial on the far side ([`26_ota_deployments.md`](26_ota_deployments.md)) |
 | | `GET /roster` | the public view **plus** each node's address, boot cause, heap floors, die temperature, `on_trial` |

@@ -3,12 +3,12 @@
 The bard: a Waveshare ESP32-S3-Touch-LCD-4.3B - an integrated board with its
 own S3, an 800x480 touch panel and no wires to the fleet. It joins the
 ESP-NOW control plane as the second **witness** (`eligible=false`) and turns
-the gossip into a five-tile touch dashboard. Like the pysar, it compiles the
+the gossip into a six-tile touch dashboard. Like the pysar, it compiles the
 swarm control plane straight out of `eth/main/` and can never win the
 election ([`20_firmware.md`](20_firmware.md), shared source layout). It rides behind THE FACE in
 the rack ([`../1_hardware/16_rack.md`](../1_hardware/16_rack.md)).
 
-![The kobzar firmware, gossip in, five tiles out](diagrams/mission-firmware-map.svg)
+![The kobzar firmware, gossip in, six tiles out](diagrams/mission-firmware-map.svg)
 
 ## Hardware facts (vendor-sourced)
 
@@ -40,7 +40,7 @@ so bring-up order is expander first, then panel.
   full_refresh`. Uses the current `i2c_master` API throughout (the legacy
   I2C driver is deprecated; vendor demo code still uses it and is not
   copied) and `in_color_format = LCD_COLOR_FMT_RGB565`.
-- **`ui.c`** - the five tiles (next section).
+- **`ui.c`** - the six tiles (next section).
 - **`mission_main.c`** - NVS, blackbox, vitals, netif, event loop, panel,
   UI, `swarm_start()`, the OTA boot trial, then a 1 Hz render task that
   feeds `ui_update()` from `swarm_snapshot()`.
@@ -64,7 +64,7 @@ First-light triage, should the panel misbehave: colours inverted or shifted
 mean the data-pin order; dead touch means the GT911 is at its backup address
 0x14 (the component probes 0x5D first); tearing means a taller bounce buffer.
 
-## Five tiles (swipe order)
+## Six tiles (swipe order)
 
 1. **Mission control.** Header: IVAN BOHUN, the mask's address, the current
    otaman, and an amber release chip whenever an OTA is flowing anywhere in
@@ -96,10 +96,24 @@ mean the data-pin order; dead touch means the GT911 is at its backup address
    start, never as a negative rate.
 4. **CONVERSIONS.** Counters for the page's outbound links, per blade and
    fleet-wide.
-5. **THE RADIO.** The gossip tail: every heartbeat heard in the last ~45 s,
+5. **TEMPERATURE.** The rack's six dies - N1-N4, the pysar and the kobzar
+   itself - over the last 24 hours, one line each, in 5-minute UTC buckets
+   (288 points per node). Three buttons, `max` / `min` / `avg`, pick which
+   statistic of each bucket is drawn; the Y axis is fixed at 30-80 C (the die
+   sensor's own range tops out at 80), the X axis is marked every three hours
+   on the round UTC hour (`12am`, `3am`, ...), and a footer legend pairs each
+   node with its colour. A bucket in which a node was not heard holds zero, by
+   the owner's rule, which on that axis draws on the floor - a gap reads as a
+   gap and never as a plausible temperature. The history
+   is `logic.h`'s thermal ring (host-tested), fed at 1 Hz from the heartbeat's
+   die temperature and kept in PSRAM; it starts empty at every boot. The
+   clock is the blades' time beacon ([`23_node_swarm.md`](23_node_swarm.md)):
+   until the first one lands the tile says "no clock yet" and records nothing,
+   and once it has one the header shows the UTC time and which blade set it.
+6. **THE RADIO.** The gossip tail: every heartbeat heard in the last ~45 s,
    newest first, with sender, RSSI and sequence-gap markers - the radio's
    own health, visible.
-(A sixth tile once showed the served page itself, memory-mapped from a 12 MB
+(A tile once showed the served page itself, memory-mapped from a 12 MB
 RGB565 strip in its own partition. Retired in v12; the partition stays in the
 table because a table change does not travel over OTA.)
 
@@ -114,5 +128,5 @@ table because a table change does not travel over OTA.)
 - **A footer tap blanks the glass** - the backlight is cut through CH422G
   IO2 (on/off only; the expander cannot PWM), resets stay high and touch
   stays live, so any touch wakes it.
-- Node cards and the chronicle card open their overlays (five tiles); tapping an
+- Node cards and the chronicle card open their overlays; tapping an
   overlay closes it.

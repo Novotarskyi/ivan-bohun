@@ -25,6 +25,7 @@ bool    swarm_own_updating(void);              /* our own OTA-in-progress flag *
 uint8_t swarm_own_update_pct(void);
 int     swarm_peers_heard(void);               /* peers currently alive on the radio */
 void    swarm_repin_channel(void);             /* restore the pinned ESP-NOW channel */
+uint8_t swarm_clock_source(void);             /* who last set this clock by time beacon (eth v20); 0 = nobody yet */
 
 /* the mask's fixed identity, for the display to show */
 /* ONE definition of the mask, in both shapes callers need. mask.c held the
