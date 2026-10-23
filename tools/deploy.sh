@@ -16,8 +16,8 @@
 # Any failure aborts. Leader-last ordering means an abort leaves the public face
 # still serving the last good image.
 #
-# GATE 4, THE TRIAL. A fresh image is on TRIAL for 90 s of continuous serving
-# (main/selftest.c SOAK_S) with a 300 s deadline, after which the node reboots
+# GATE 4, THE TRIAL. A fresh image is on TRIAL for 60 s of continuous serving
+# (main/selftest.c SOAK_S) with a 200 s deadline, after which the node reboots
 # and the bootloader restores the previous slot - so a node can pass the first
 # three gates and still roll back minutes later. Every node publishes
 # `on_trial` on the admin roster; this polls for the real answer and only
@@ -105,8 +105,8 @@ for entry in "${NODES[@]}"; do
   # GATE 0: never push to a node that is still on trial. ESP-IDF refuses
   # esp_ota_begin() while the running image is PENDING_VERIFY, and the node
   # answers an honest 500 "ota_begin failed" that reads like a firmware
-  # fault. The trial is 90 s; wait it out.
-  for _ in $(seq 1 40); do
+  # fault. The trial is 60 s (deadline 200 s); wait it out.
+  for _ in $(seq 1 30); do
     [ "$(probe_trial "$ip")" != "true" ] && break
     printf "on trial, waiting… "
     sleep 5
@@ -165,9 +165,9 @@ done
 # --- gate 4: every node must EARN permanence, not just survive a sleep -------
 echo
 echo "$pushed node(s) took the image. Waiting for the trial to mark each one valid"
-echo "(90 s of continuous serving each; rollback deadline is 300 s)..."
+echo "(60 s of continuous serving each; rollback deadline is 200 s)..."
 still=""
-for _ in $(seq 1 40); do                          # up to ~200 s
+for _ in $(seq 1 30); do                          # up to ~150 s
   still=""
   for entry in "${NODES[@]}"; do
     read -r name ip <<< "$entry"

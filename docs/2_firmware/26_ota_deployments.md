@@ -40,8 +40,8 @@ order:
 - **gate 3, new build** - the `X-Bohun-Build` stamp changes to the pushed
   SHA, read from the blade's **own backend port** (asking the public port
   answers from whichever backend the splicer picked);
-- **gate 4, the trial** - the fresh image must survive **90 s of continuous
-  serving within a 300 s deadline** or the bootloader rolls back to the
+- **gate 4, the trial** - the fresh image must survive **60 s of continuous
+  serving within a 200 s deadline** or the bootloader rolls back to the
   previous slot. The script polls the node's published `on_trial` flag rather
   than sleeping and hoping.
 

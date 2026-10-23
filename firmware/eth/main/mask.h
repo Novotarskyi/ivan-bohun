@@ -32,7 +32,10 @@ void mask_set_ip(uint32_t ip);
 uint32_t mask_get_ip(void);
 bool mask_is_wearing(void);
 /* Do we currently hold an address at all? A blade between the mask and a fresh
- * DHCP lease is reachable by nobody, and must not claim to be serving. */
+ * DHCP lease is reachable by nobody, and must not claim to be serving. One
+ * exception: for the first 5 s of a claim the identity swap costs the address
+ * and the claimant still answers yes, or the peers that just elected it read
+ * it as unable and the next id claims too (bohun_claim_grace). */
 bool mask_has_ip(void);
 bool mask_link_up(void);
 bool mask_link_lost(void);   /* down for longer than a transition bounce */     /* Ethernet PHY link state - the data plane's own opinion */

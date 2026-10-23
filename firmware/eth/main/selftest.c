@@ -21,14 +21,17 @@ static const char *TAG = "bohun_selftest";
 
 /* Long enough to outlive a boot-time crash and a first real handshake; short
  * enough that a good release settles quickly. The dynamic-buffer panic hit
- * within a minute of taking traffic, so this window would have caught it. */
-#define SOAK_S          90
+ * within a minute of taking traffic, so this window would have caught it.
+ * 90 s until 2026-10-23, cut to 60 on the owner's call - the displays have
+ * proved themselves in 60 all along, and a four-blade roll spent two of its
+ * three minutes here. */
+#define SOAK_S          60
 #define POLL_MS         2000
 /* THE DEADLINE - D8 is toothless without it: rollback needs a REBOOT, and
  * the worst failure mode is perfectly stable while serving nothing. If the
  * trial is not won by the deadline, reboot ourselves and let the bootloader
  * do its job. */
-#define DEADLINE_S      300
+#define DEADLINE_S      200
 
 static void selftest_task(void *arg)
 {

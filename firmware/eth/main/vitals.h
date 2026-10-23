@@ -20,7 +20,8 @@
 /* Operating norms, shared with every glass that colours a reading: below
  * TEMP_WARN_C is normal, at it the blackbox starts logging TEMPHI, at
  * TEMP_HOT_C the log message escalates. Same numbers, one place. */
-#define TEMP_WARN_C   60
+#define TEMP_WARN_C   65   /* 60 until 2026-10-23: the blades idle at 58-60 in a warm room and the edge
+                           * flapped every ~165 s, 145 of N1's 256 blackbox slots were that one line */
 #define TEMP_HOT_C    70
 
 #define VITALS_TEMP_NONE  ((int16_t)-32768)

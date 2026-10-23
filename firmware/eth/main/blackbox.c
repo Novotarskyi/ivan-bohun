@@ -73,6 +73,7 @@ static const char *kind_name(uint8_t k)
     case BBX_VALID:    return "VALID";
     case BBX_VARIANT:  return "VARIANT";
     case BBX_TEMPHI:   return "TEMPHI";
+    case BBX_SPLICE:   return "SPLICE";
     default:           return "?";
     }
 }

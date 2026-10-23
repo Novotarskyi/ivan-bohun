@@ -137,7 +137,14 @@ changing either means one edit.
 `esp_eth_ioctl` SHAR rewrite - the register-level seam the toolchain was
 chosen for), applies the mask's static address, and announces with a
 gratuitous ARP burst so the switch relearns the port. The visitor sees the
-same MAC, same address, same certificate - different silicon.
+same MAC, same address, same certificate - different silicon. The SHAR
+rewrite stops and restarts the PHY, and for the 1-3 s until the static
+address is set the claimant holds no IP - so for the first 5 s of a claim its
+heartbeat keeps saying `serving` (`bohun_claim_grace`). Without that grace
+the peers that just elected it read the blackout as a dead claimant: on
+2026-10-23 N3 and N4 each claimed two seconds after N2 and three blades wore
+the vMAC inside three seconds. Past the grace the truth shows, so a claimant
+whose link never returns is still replaced.
 
 **Losing** is the mirror image, and two hardenings make it invisible:
 

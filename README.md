@@ -54,7 +54,7 @@ be hosted by anyone.
   actually come back, because a self-reported flag can lie.
 - **Releases cannot brick the fleet.** One key-gated, variant-guarded OTA
   door for all six members. Deploys roll followers first, leader last, and a
-  fresh image must survive a 90-second serving trial or the bootloader rolls
+  fresh image must survive a 60-second serving trial or the bootloader rolls
   it back. The radio-only displays update through a touch-opened OTA window
   under the same rollback contract.
 - **No reboot goes unexplained.** Every node keeps a 4096-record blackbox
@@ -110,8 +110,8 @@ The rules the fleet lives by - who leads, what availability means, when
 the balancer benches a blade - are pure functions in one header,
 [`logic.h`](firmware/eth/main/logic.h), proven on the host by
 [`tools/run_tests.sh`](tools/run_tests.sh) with ESP-IDF's own Unity
-(65 tests, ASan/UBSan). The serving path proves itself on the machine
-instead: a fresh image must survive a 90-second public serving trial or
+(69 tests, ASan/UBSan). The serving path proves itself on the machine
+instead: a fresh image must survive a 60-second public serving trial or
 the bootloader rolls it back. Module-by-module detail:
 [`docs/2_firmware/`](docs/2_firmware/).
 
@@ -218,7 +218,7 @@ Then, in order:
    tools/deploy.sh
    ```
    Followers first, leader last, four gates per node including the
-   90-second rollback trial. Re-running is idempotent - blades already on
+   60-second rollback trial. Re-running is idempotent - blades already on
    the target image are skipped.
 
 ## Map

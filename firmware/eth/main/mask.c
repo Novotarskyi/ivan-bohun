@@ -24,6 +24,7 @@
 #include "serve.h"
 #include "swarm_identity.h"
 #include "swarm.h"
+#include "logic.h"   /* bohun_claim_grace: a claimant mid-swap still counts as reachable */
 
 static const char *TAG = "bohun_mask";
 
@@ -35,6 +36,12 @@ static const uint8_t VMAC[6] = SWARM_VMAC_BYTES;
  * swap_identity(). The mask uses a static address, never DHCP: a timeout here
  * is a claim failure, not a lease failure. */
 #define MASK_CLAIM_TIMEOUT_US (10 * 1000000)
+/* The swap stops and restarts the PHY: 1-3 s measured until the static address
+ * is set. For this long a claimant still reads as holding an address, or its own
+ * heartbeat tells the peers that just elected it that it is unable, and the
+ * next id claims too - the 2026-10-23 cascade, three blades wearing the vMAC
+ * inside three seconds (bohun_claim_grace). */
+#define MASK_CLAIM_GRACE_MS 5000
 
 /* the mask's FIXED address - always reachable, whoever leads. The address and
  * gateway are deployment config from secrets.h (via mask.h). */
@@ -60,7 +67,11 @@ static volatile uint32_t s_current_ip;
 void mask_set_ip(uint32_t ip) { s_current_ip = ip; }
 uint32_t mask_get_ip(void) { return s_current_ip; }
 bool mask_is_wearing(void) { return s_wearing; }
-bool mask_has_ip(void) { return s_have_ip; }
+bool mask_has_ip(void)
+{
+    return bohun_claim_grace(s_wearing, s_have_ip, (uint32_t)(s_wear_started_us / 1000),
+                             (uint32_t)(esp_timer_get_time() / 1000), MASK_CLAIM_GRACE_MS);
+}
 
 void mask_init(esp_eth_handle_t eth_handle, esp_netif_t *eth_netif)
 {

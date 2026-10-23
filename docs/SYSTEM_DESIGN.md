@@ -141,8 +141,10 @@ Two independent mechanisms, one per side of the relay:
 ![Self-healing](2_firmware/diagrams/self-healing.svg)
 
 - **Self-probe (every blade)**: a TCP connect to its own public port over
-  loopback every 7 s. Two consecutive failures: the blade reports itself
-  not-serving, leaves the election, and every splicer benches it within ~2 s.
+  loopback every 7 s. Two consecutive failures with no visitor admitted in
+  between: the blade reports itself not-serving, leaves the election, and
+  every splicer benches it within ~2 s. A failure while the splicer is
+  admitting visitors is load, not death, and does not count.
   Six failures (~42 s of a dead server): a deliberate `abort()`, so the
   coredump names the task the server was stuck in, then reboot.
 - **Circuit breaker (the load balancer)**: judges backends by the bytes that
@@ -225,8 +227,8 @@ Blades update over the admin plane, orchestrated by `tools/deploy.sh`:
 1. **Followers first, leader last** - the public face keeps serving the old
    image until everyone else has proven the new one.
 2. Gates 1-3 per node: image accepted, node rebooted, build hash changed.
-3. **Gate 4, the trial**: a fresh image must survive 90 s of continuous
-   serving within a 300 s deadline or the bootloader rolls back to the
+3. **Gate 4, the trial**: a fresh image must survive 60 s of continuous
+   serving within a 200 s deadline or the bootloader rolls back to the
    previous slot. The deploy polls each node's published `on_trial` flag
    rather than sleeping and hoping.
 

@@ -93,7 +93,14 @@ picked, so it cannot identify a blade.
   handshake is pure CPU - the ESP32-S3 has no ECC accelerator, so P-256 runs
   in software and scales with the clock; SHA/AES/MPI acceleration does not
   help ECDHE. PSRAM lifts the heap floor from tens of KB to megabytes and
-  pays for 8 open sockets.
+  pays for 8 open sockets. Since v25 the TLS record buffers live there too:
+  mbedTLS had been pinned to internal SRAM (IDF's default), so every session
+  kept its 16 KB in-buffer and 4 KB out-buffer in the ~120 KB that lwIP and
+  the servers share - one handshake cost ~37 KB, two crossed the 64 KB amber
+  line on every visitor burst, three once left a backend 11.5 KB from an
+  allocation failure. The allocator now follows the malloc policy
+  (`CONFIG_MBEDTLS_DEFAULT_MEM_ALLOC`): the record buffers land in PSRAM,
+  the small ECC allocations that pace the handshake stay internal.
 - **`TCP_NODELAY` set before the handshake.** Sender-side Nagle against an
   lwIP peer's 250 ms delayed ACK quantizes every spliced flight; mandatory
   behind the splicer, harmless for direct LAN visitors.
@@ -125,9 +132,19 @@ load would otherwise stand itself down for being popular - which is exactly
 what it did, 21 times over 16 days, until this rule went in.
 
 - **Two consecutive dead probes**: the blade reports itself not-serving, leaves
-  the election, and every splicer benches it within about 2 s.
+  the election, and every splicer benches it within about 2 s. The flight
+  recorder names the path, not just the verdict: both errnos, the relay pairs
+  busy and the visitors admitted in the window (`probe dead e=116/116 busy=3
+  acc+0`).
 - **Busy probes are not failures**: the streak stands still while the pool is
   full, so load can never masquerade as death.
+- **A failure while visitors are being admitted is busy, not dead**: the probe
+  reads the splicer's accept count across its own window. A listener that
+  admitted anyone in those seconds is alive by direct evidence, whatever the
+  probe's connect met - congestion at the accept path times out or resets it
+  exactly as death would. On 2026-10-23 the leader stood itself down twice,
+  each time 13-15 s after a burst had two backends in TLS handshakes at once;
+  only a probe that fails with nobody admitted counts now.
 - **No probe while the splicer holds the pool**: with seven or more relay pairs
   in flight the probe is skipped outright, because a connect would take the
   last control block and the listener's silent SYN drop would read as a

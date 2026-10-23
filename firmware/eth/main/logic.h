@@ -115,6 +115,23 @@ static inline uint8_t bohun_elect(uint8_t self_id, bool self_ok,
     return best == 0xff ? 0 : best;
 }
 
+/* A fresh claimant looks unable for a moment: claiming the mask stops and
+ * restarts the PHY (swap_identity), and until the static address is set the
+ * blade holds no IP, so its heartbeat would say serving=0 to the very peers
+ * that just elected it. On 2026-10-23 the next-lowest id read that 1-3 s
+ * blackout as a dead claimant and claimed too, and the one after it did the
+ * same - three blades wearing the vMAC inside three seconds. For grace_ms
+ * from the claim the claimant counts as holding an address; past it the
+ * truth shows, so a claimant whose link never returns is still replaced. */
+static inline bool bohun_claim_grace(bool wearing, bool has_ip, uint32_t claimed_ms,
+                                     uint32_t now_ms, uint32_t grace_ms)
+{
+    if (has_ip) {
+        return true;
+    }
+    return wearing && (uint32_t)(now_ms - claimed_ms) < grace_ms;
+}
+
 /* THE BENCH's two laws (the splicer's circuit breaker).
  * Threshold: a fresh offender must fail `streak` connections in a row before
  * it is benched, but a repeat offender re-benches on ONE - re-proving a known
@@ -267,6 +284,20 @@ static inline bool bohun_probe_fit(uint8_t fails, uint8_t sick_at,
 static inline bool bohun_probe_room(uint8_t pairs, uint16_t pool)
 {
     return (uint16_t)(2u * pairs + 4u) <= pool;
+}
+
+/* A probe that failed inside the window in which the splicer admitted a
+ * visitor is not evidence of death: a congested accept path times out or
+ * resets the probe's own connect exactly as a dead listener would, and on
+ * 2026-10-23 the leader stood itself down twice on morning bursts because
+ * of it. Admission is proof of life, so the verdict softens to busy and the
+ * streak stands still; with nobody admitted the verdict stands. */
+static inline bohun_probe_t bohun_probe_judge(bohun_probe_t v, uint32_t admitted_since)
+{
+    if (v == BOHUN_PROBE_DEAD && admitted_since > 0) {
+        return BOHUN_PROBE_BUSY;
+    }
+    return v;
 }
 
 /* A relayed connection whose client has sent nothing since accept is not a

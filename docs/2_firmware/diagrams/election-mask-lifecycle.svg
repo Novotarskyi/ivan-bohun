@@ -46,5 +46,5 @@
 <text x="742" y="560" font-size="10" fill="#ff5555">6 fails: abort() for a</text>
 <text x="742" y="574" font-size="10" fill="#ff5555">coredump, reboot to BOOT</text>
 <rect x="60" y="596" width="980" height="1" fill="#2a2a33"/>
-<text x="60" y="622" font-size="10" fill="#7a7880">constants: heartbeat 1 Hz - peer lost after 3 s - election tick 200 ms - link grace 6 s - self-probe every 7 s - handover observed under 4 s</text>
+<text x="60" y="622" font-size="10" fill="#7a7880">constants: heartbeat 1 Hz - peer lost after 3 s - election tick 200 ms - link grace 6 s - claim grace 5 s - self-probe every 7 s - handover observed under 4 s</text>
 </svg>

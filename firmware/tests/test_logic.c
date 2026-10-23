@@ -202,6 +202,17 @@ static void test_elect_self_unfit_peer_leads(void)
     TEST_ASSERT_EQUAL_UINT8(4, bohun_elect(1, false, peers, 1));
 }
 
+static void test_claim_grace_covers_the_swap_then_tells_the_truth(void)
+{
+    TEST_ASSERT_TRUE(bohun_claim_grace(false, true, 0, 50000, 5000));      /* a follower on its lease */
+    TEST_ASSERT_FALSE(bohun_claim_grace(false, false, 0, 50000, 5000));    /* no lease, not claiming: unreachable */
+    TEST_ASSERT_TRUE(bohun_claim_grace(true, false, 50000, 50000, 5000));  /* claimed this instant, PHY bouncing */
+    TEST_ASSERT_TRUE(bohun_claim_grace(true, false, 50000, 54999, 5000));  /* 1-3 s measured; 5 s covers it */
+    TEST_ASSERT_FALSE(bohun_claim_grace(true, false, 50000, 55000, 5000)); /* link never came back: replaced */
+    TEST_ASSERT_TRUE(bohun_claim_grace(true, true, 50000, 99999, 5000));   /* address set: the claim is good */
+    TEST_ASSERT_TRUE(bohun_claim_grace(true, false, 0xFFFFF000u, 0x00000100u, 5000)); /* 4.3 s, through the wrap */
+}
+
 /* ---- the bench --------------------------------------------------------- */
 
 static void test_bench_fresh_offender_needs_streak(void)
@@ -366,6 +377,16 @@ static void test_probe_room_leaves_two_blocks_spare(void)
     TEST_ASSERT_TRUE(bohun_probe_room(6, 16));    /* 12 + the probe's 2 + 2 spare */
     TEST_ASSERT_FALSE(bohun_probe_room(7, 16));   /* 14: the probe would take the last block */
     TEST_ASSERT_FALSE(bohun_probe_room(8, 16));   /* 16: socket() itself fails */
+}
+
+static void test_probe_judge_admission_is_proof_of_life(void)
+{
+    /* the 2026-10-23 morning: a dead-reading probe while visitors were being admitted */
+    TEST_ASSERT_EQUAL(BOHUN_PROBE_BUSY, bohun_probe_judge(BOHUN_PROBE_DEAD, 1));
+    TEST_ASSERT_EQUAL(BOHUN_PROBE_BUSY, bohun_probe_judge(BOHUN_PROBE_DEAD, 12));
+    TEST_ASSERT_EQUAL(BOHUN_PROBE_DEAD, bohun_probe_judge(BOHUN_PROBE_DEAD, 0));   /* nobody in: death stands */
+    TEST_ASSERT_EQUAL(BOHUN_PROBE_OK, bohun_probe_judge(BOHUN_PROBE_OK, 0));
+    TEST_ASSERT_EQUAL(BOHUN_PROBE_BUSY, bohun_probe_judge(BOHUN_PROBE_BUSY, 0));
 }
 
 static void test_pair_silent_client_never_spoke(void)
@@ -705,6 +726,7 @@ int main(void)
     RUN_TEST(test_elect_dead_or_unable_peers_skipped);
     RUN_TEST(test_elect_preemption);
     RUN_TEST(test_elect_self_unfit_peer_leads);
+    RUN_TEST(test_claim_grace_covers_the_swap_then_tells_the_truth);
     RUN_TEST(test_bench_fresh_offender_needs_streak);
     RUN_TEST(test_bench_repeat_offender_rebenches_on_one);
     RUN_TEST(test_bench_backoff_doubles_and_caps);
@@ -723,6 +745,7 @@ int main(void)
     RUN_TEST(test_probe_fit_hold_down_after_stand_down);
     RUN_TEST(test_probe_fit_survives_49_day_wrap);
     RUN_TEST(test_probe_room_leaves_two_blocks_spare);
+    RUN_TEST(test_probe_judge_admission_is_proof_of_life);
     RUN_TEST(test_pair_silent_client_never_spoke);
     RUN_TEST(test_refusal_clip_terminates_and_fills_blanks);
     RUN_TEST(test_refusal_record_clips_every_field);

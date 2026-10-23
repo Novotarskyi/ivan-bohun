@@ -76,6 +76,14 @@ CONFIG_LWIP_TCP_RECVMBOX_SIZE=32
 # fine, which is exactly why a follower canary could not catch it. Do not re-try
 # without an IDF release-note saying TLS 1.3 server support landed.
 # CONFIG_MBEDTLS_DYNAMIC_BUFFER is not set
+# 2026-10-23: mbedTLS allocations were pinned to INTERNAL SRAM (IDF's default), so
+# every TLS session parked its 16 KB in-buffer and 4 KB out-buffer in the same
+# ~120 KB that lwIP and the servers live in: one handshake took ~37 KB, two
+# crossed the 64 KB amber line on every visitor burst, and three left N3 with
+# 11.5 KB free. DEFAULT mode is plain malloc, which under
+# SPIRAM_MALLOC_ALWAYSINTERNAL=4096 sends the record buffers to PSRAM and keeps
+# the small ECC/bignum allocations - the handshake's hot path - internal.
+CONFIG_MBEDTLS_DEFAULT_MEM_ALLOC=y
 # 2026-08-02: panic post-mortems land in flash (the coredump partition carved
 # from the unused assets region). Read back: GET :8443/coredump -> espcoredump.py.
 CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH=y

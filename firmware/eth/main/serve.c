@@ -132,14 +132,17 @@ static int64_t s_standby_until_us;
 static volatile uint8_t  s_probe_fails;
 static volatile uint32_t s_stood_down_ms;   /* ms stamp of the last sick-level failure, 0 = never */
 static volatile int64_t s_probe_ran_us;
+static int s_probe_err_prev;                /* errno of the streak's first failure, for the record */
 
 /* A connect needs a PCB from the pool the splicer fills on purpose, so a
  * full node cannot tell "busy" from "dead" by success alone: the errno
- * decides (bohun_probe_verdict). */
-static bohun_probe_t probe_once(uint16_t port)
+ * decides (bohun_probe_verdict). Returns 0 for connected, else that errno -
+ * the caller judges AND records it, because the 2026-10-23 stand-downs left
+ * no trace of which failure the probe had met. */
+static int probe_once(uint16_t port)
 {
     int fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (fd < 0) return bohun_probe_verdict(false, errno);
+    if (fd < 0) return errno;
     int fl = fcntl(fd, F_GETFL, 0);
     fcntl(fd, F_SETFL, fl | O_NONBLOCK);
     struct sockaddr_in a = {
@@ -161,21 +164,35 @@ static bohun_probe_t probe_once(uint16_t port)
         err = errno;
     }
     close(fd);
-    return bohun_probe_verdict(err == 0, err);
+    return err;
 }
 
 static void probe_task(void *arg)
 {
     (void)arg;
+    uint32_t admitted_seen = 0;          /* the splicer's accept count at the previous probe */
     vTaskDelay(pdMS_TO_TICKS(20000));    /* let the servers finish coming up */
     for (;;) {
         bohun_probe_t v;
-        splice_stats_t st;
+        int err = 0;                     /* 0 = connected or skipped; else what the connect met */
+        splice_stats_t st = {0};
         if (splice_stats_get(&st) && !bohun_probe_room(st.busy, CONFIG_LWIP_MAX_ACTIVE_TCP)) {
             v = BOHUN_PROBE_BUSY;   /* the splicer holds the pool - do not spend two blocks to learn that */
         } else {
-            v = probe_once(CONFIG_BOHUN_PUBLIC_PORT);
+            err = probe_once(CONFIG_BOHUN_PUBLIC_PORT);
+            v = bohun_probe_verdict(err == 0, err);
         }
+        /* Visitors admitted since the previous probe, read AFTER the connect so
+         * the window covers it. A listener that admitted anyone is alive by
+         * direct evidence, whatever our own connect met: 2026-10-23 the leader
+         * stood down twice on bursts that had two backends in TLS handshakes
+         * at once (bohun_probe_judge). */
+        uint32_t admitted = 0;
+        if (splice_stats_get(&st)) {
+            admitted = st.accepted - admitted_seen;
+            admitted_seen = st.accepted;
+        }
+        v = bohun_probe_judge(v, admitted);
         s_probe_ran_us = esp_timer_get_time();
         uint8_t before = s_probe_fails;
         s_probe_fails = bohun_probe_streak(before, v);
@@ -183,18 +200,34 @@ static void probe_task(void *arg)
             if (before) {
                 ESP_LOGW(TAG, "self-probe recovered after %d failures", before);
             }
+            s_probe_err_prev = 0;
         } else if (v == BOHUN_PROBE_BUSY) {
-            /* the pool is full: that is load, not death - the streak stands still */
-            ESP_LOGW(TAG, "self-probe could not run: no socket/PCB free (streak stays %d)", before);
+            /* load, not death - the streak stands still, whichever way we learnt it */
+            if (err == 0) {
+                ESP_LOGW(TAG, "self-probe skipped: %u relay pairs hold the pool (streak stays %d)",
+                         st.busy, before);
+            } else if (admitted) {
+                ESP_LOGW(TAG, "self-probe failed (errno %d) while the splicer admitted %lu visitor(s): "
+                              "congestion, not death (streak stays %d)",
+                         err, (unsigned long)admitted, before);
+            } else {
+                ESP_LOGW(TAG, "self-probe could not run: no socket/PCB free, errno %d (streak stays %d)",
+                         err, before);
+            }
         } else {
-            ESP_LOGE(TAG, "SELF-PROBE FAILED (%d): nothing can open :%d on this node",
-                     s_probe_fails, CONFIG_BOHUN_PUBLIC_PORT);
+            ESP_LOGE(TAG, "SELF-PROBE FAILED (%d): nothing can open :%d on this node "
+                          "(errno %d, %u pairs busy, %lu admitted since the last probe)",
+                     s_probe_fails, CONFIG_BOHUN_PUBLIC_PORT, err, st.busy, (unsigned long)admitted);
             if (s_probe_fails >= PROBE_FAIL_SICK) {
                 s_stood_down_ms = (uint32_t)(s_probe_ran_us / 1000);
             }
             if (s_probe_fails == PROBE_FAIL_SICK) {
-                blackbox_event(BBX_ERR5XX, 0, "self-probe: own port dead, standing down");
+                /* both errnos, the relay load and the admissions in the window:
+                 * the path the probe died on, not just that it died */
+                blackbox_event(BBX_ERR5XX, (uint16_t)err, "probe dead e=%d/%d busy=%u acc+%lu",
+                               s_probe_err_prev, err, (unsigned)st.busy, (unsigned long)admitted);
             }
+            s_probe_err_prev = err;
             if (s_probe_fails >= PROBE_FAIL_ABORT) {
                 blackbox_event(BBX_BOOT, (uint16_t)s_probe_fails,
                                "own port dead %d probes - abort for coredump", s_probe_fails);
